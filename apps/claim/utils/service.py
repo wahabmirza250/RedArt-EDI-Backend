@@ -273,7 +273,8 @@ def validate_claim_for_edi(claim, *, update_status=True):
                 if not (getattr(provider, "medicaid_provider_id", None) or "").strip():
                     errors.append(
                         "Provider medicaid_provider_id is missing "
-                        "(required for atypical providers, NM108=1C in 837P)."
+                        "(required for atypical providers, NM108=XX / NM109 "
+                        "medicaid_provider_id in 837P)."
                     )
             else:
                 if not (provider.npi or "").strip():

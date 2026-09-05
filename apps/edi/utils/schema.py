@@ -8,11 +8,12 @@ Enterprise rules enforced here:
   - NEVER fabricate DOB, gender, address, NPI, or any other missing data.
   - Provider NM108/NM109 driven by is_atypical flag:
       Standard (is_atypical=False): NM108=XX, NM109=npi
-      Atypical   (is_atypical=True): NM108=1C, NM109=medicaid_provider_id
+      Atypical   (is_atypical=True): NM108=XX, NM109=medicaid_provider_id
+        (matches HCPF-accepted sample shape; never fabricate an NPI)
   - 2010BA NM108=MI, NM109=Colorado Medicaid Member ID (always dynamic).
   - N3/N4 segments emitted only when address data is present.
   - DMG segment emitted only when DOB or gender is present.
-  - REF*EI emitted only when tax_id is present (NPI providers).
+  - REF*EI emitted only when tax_id is present (never invent EIN).
   - ISA segment is always exactly 106 characters (including terminator).
 """
 
@@ -205,11 +206,12 @@ def build_edi_content(payload: dict) -> list[str]:
         edi_content.append(_seg(envelope, "HL", str(billing_hl), "", "20", "1"))
 
         # ── 2010AA Billing Provider Name ─────────────────────────────────────
-        # NM108/NM109 depend on provider type:
-        #   Standard (is_atypical=False): NM108=XX, NM109=npi
-        #   Atypical  (is_atypical=True): NM108=1C, NM109=medicaid_provider_id
+        # NM108 is always XX (matches HCPF-accepted sample).
+        # NM109:
+        #   Standard (is_atypical=False): npi
+        #   Atypical  (is_atypical=True): medicaid_provider_id (never invent NPI)
         is_atypical = bool(provider.get("is_atypical"))
-        billing_qualifier = "1C" if is_atypical else "XX"
+        billing_qualifier = "XX"
         billing_id = (
             provider.get("medicaid_provider_id", "")
             if is_atypical
@@ -252,14 +254,12 @@ def build_edi_content(payload: dict) -> list[str]:
             if city or state or zip_code:
                 edi_content.append(_seg(envelope, "N4", city, state, zip_code))
 
-        # REF*EI (tax_id / EIN) — only for NPI providers and only when present.
-        # Atypical providers do not have REF*EI.
-        if not is_atypical:
-            tax_id = "".join(
-                ch for ch in str(provider.get("tax_id") or "") if ch.isdigit()
-            )
-            if tax_id:
-                edi_content.append(_seg(envelope, "REF", "EI", tax_id[:9]))
+        # REF*EI (tax_id / EIN) — only when a real tax_id exists. Never invent.
+        tax_id = "".join(
+            ch for ch in str(provider.get("tax_id") or "") if ch.isdigit()
+        )
+        if tax_id:
+            edi_content.append(_seg(envelope, "REF", "EI", tax_id[:9]))
 
         # ── 2000B Subscriber HL ──────────────────────────────────────────────
         edi_content.append(_seg(envelope, "HL", "2", str(billing_hl), "22", "0"))

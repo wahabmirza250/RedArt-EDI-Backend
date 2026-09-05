@@ -12,7 +12,7 @@ Design principles:
       * ISA fixed-length enforcement.
       * TEST / PRODUCTION isolation.
       * Multi-company claim isolation.
-      * Atypical provider NM108=1C path.
+      * Atypical provider NM108=XX + medicaid_provider_id path.
       * EDI_GENERATED ≠ EDI_SENT ≠ EDI_ACCEPTED ≠ PAID.
 """
 
@@ -310,17 +310,17 @@ class TestAtypicalProvider(EnterpriseFixturesMixin, TestCase):
         batch = self._make_batch(self.partner, claim)
         return batch
 
-    def test_atypical_provider_nm108_is_1c(self):
-        """Atypical provider: NM108=1C, NM109=medicaid_provider_id."""
+    def test_atypical_provider_nm108_is_xx(self):
+        """Atypical provider: NM108=XX, NM109=medicaid_provider_id (no invented NPI)."""
         from apps.edi.utils.handler import Generate837PHandler
         batch = self._build_atypical_batch()
         payload = Generate837PHandler(batch.id).build_payload_dict()
         body = render_edi_file(build_edi_content(payload))
-        self.assertIn("*1C*ATYPTST001~", body)
-        self.assertNotIn("*XX*", body)
+        self.assertIn("*XX*ATYPTST001~", body)
+        self.assertNotIn("*1C*", body)
 
-    def test_atypical_provider_no_ref_ei(self):
-        """Atypical providers must NOT emit REF*EI (no EIN)."""
+    def test_atypical_provider_no_ref_ei_without_tax_id(self):
+        """Without tax_id, do not invent REF*EI."""
         from apps.edi.utils.handler import Generate837PHandler
         batch = self._build_atypical_batch()
         payload = Generate837PHandler(batch.id).build_payload_dict()

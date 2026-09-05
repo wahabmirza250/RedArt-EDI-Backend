@@ -138,7 +138,7 @@ class Generate837PHandler:
                         # is_atypical controls NM108/NM109 in the 837P schema builder.
                         "is_atypical": bool(getattr(provider, "is_atypical", False)),
                         "npi": (provider.npi or "").strip(),
-                        # Atypical providers use medicaid_provider_id (NM108=1C).
+                        # Atypical providers use medicaid_provider_id as NM109 (NM108=XX).
                         "medicaid_provider_id": (
                             getattr(provider, "medicaid_provider_id", None) or ""
                         ).strip(),

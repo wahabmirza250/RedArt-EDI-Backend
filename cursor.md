@@ -150,11 +150,11 @@ docs/
 ```python
 # Standard NPI provider (is_atypical=False):
 NM108 = "XX", NM109 = provider.npi
-REF*EI = provider.tax_id   # required
+REF*EI = provider.tax_id when present
 
 # Atypical Colorado Medicaid provider (is_atypical=True):
-NM108 = "1C", NM109 = provider.medicaid_provider_id
-# No REF*EI, no NPI
+NM108 = "XX", NM109 = provider.medicaid_provider_id
+# Never invent NPI; REF*EI only if real tax_id exists
 ```
 
 
@@ -236,7 +236,7 @@ POST /api/v1/provider-billing-profiles/
 }
 ```
 
-The 837P generator will automatically use `NM108=1C, NM109=CO12345678` and omit `REF*EI`.
+The 837P generator will use `NM108=XX, NM109=CO12345678` (never invent an NPI). `REF*EI` is emitted only when a real `tax_id` exists.
 
 ---
 

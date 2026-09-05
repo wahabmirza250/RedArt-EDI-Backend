@@ -19,9 +19,8 @@ Rules (Colorado Medicaid NEMT):
       - taxonomy_code required
 
     Atypical Colorado Medicaid provider (is_atypical=True, no NPI):
-      - medicaid_provider_id required (NM108=1C)
+      - medicaid_provider_id required (NM108=XX, NM109=medicaid_provider_id)
       - npi must be absent — never fabricate one
-      - taxonomy_code required
 
   Batch:
     - trading_partner with sender_id + receiver_id (ISA/GS)
@@ -98,7 +97,8 @@ def _validate_provider(provider, claim_label: str) -> list[str]:
         if not medicaid_pid:
             errors.append(
                 f"{claim_label}: provider {provider.id} is marked atypical but "
-                "is missing medicaid_provider_id (NM108=1C, NM109=medicaid_provider_id)."
+                "is missing medicaid_provider_id "
+                "(NM108=XX, NM109=medicaid_provider_id)."
             )
         npi = (provider.npi or "").strip()
         if npi:

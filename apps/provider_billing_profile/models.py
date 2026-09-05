@@ -13,7 +13,8 @@ class ProviderBillingProfile(BaseModel):
 
     Atypical providers (Colorado Medicaid atypical — no NPI assigned):
         is_atypical = True, medicaid_provider_id required, npi must be blank.
-        NM108 = 1C, NM109 = medicaid_provider_id in the 837P.
+        NM108 = XX, NM109 = medicaid_provider_id in the 837P
+        (same XX qualifier as the HCPF-accepted sample; never invent an NPI).
 
     Adding a company never requires editing source code — update via API.
     """
@@ -38,7 +39,8 @@ class ProviderBillingProfile(BaseModel):
         default=False,
         help_text=(
             "True = atypical Colorado Medicaid provider without NPI. "
-            "Uses medicaid_provider_id (NM108=1C) instead of NPI (NM108=XX)."
+            "Uses medicaid_provider_id as NM109 with NM108=XX "
+            "(never invent an NPI)."
         ),
     )
 
@@ -79,8 +81,8 @@ class ProviderBillingProfile(BaseModel):
 
     @property
     def billing_qualifier(self):
-        """Return X12 NM108 qualifier: XX (NPI) or 1C (atypical Medicaid provider)."""
-        return "1C" if self.is_atypical else "XX"
+        """Return X12 NM108 qualifier (always XX; NM109 carries NPI or Medicaid ID)."""
+        return "XX"
 
     @property
     def billing_id(self):
