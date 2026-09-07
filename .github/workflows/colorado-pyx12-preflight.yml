@@ -1,0 +1,43 @@
+name: Colorado pyx12 preflight
+
+on:
+  push:
+    branches:
+      - feature/colorado-pyx12-preflight
+    paths:
+      - "requirements.txt"
+      - "apps/edi/utils/pyx12_validation.py"
+      - "apps/edi/utils/sftp_client.py"
+      - "apps/edi/utils/schema.py"
+      - "apps/edi/tests_pyx12_preflight.py"
+      - ".github/workflows/colorado-pyx12-preflight.yml"
+  pull_request:
+    paths:
+      - "requirements.txt"
+      - "apps/edi/utils/pyx12_validation.py"
+      - "apps/edi/utils/sftp_client.py"
+      - "apps/edi/utils/schema.py"
+      - "apps/edi/tests_pyx12_preflight.py"
+      - ".github/workflows/colorado-pyx12-preflight.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run focused preflight tests
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: python -m unittest apps.edi.tests_pyx12_preflight -v
