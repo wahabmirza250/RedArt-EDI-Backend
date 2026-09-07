@@ -24,3 +24,5 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: redartdigital.settings.local
         run: pytest -q apps/edi/tests_pyx12_preflight.py
+      - name: Compile guarded one-shot command
+        run: python -m py_compile apps/edi/management/commands/submit_hcpf_one_shot.py
