@@ -1,0 +1,26 @@
+name: colorado-pyx12
+
+on:
+  push:
+    branches:
+      - fix/colorado-atypical-pyx12
+  pull_request:
+    paths:
+      - "apps/edi/**"
+      - "requirements.txt"
+      - ".github/workflows/colorado-pyx12.yml"
+
+jobs:
+  pyx12:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Run Colorado pyx12 tests
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: pytest -q apps/edi/tests_pyx12_preflight.py
