@@ -20,6 +20,7 @@ redis==8.1.0
 watchdog==6.0.0
 flower==2.1.0
 
-# EDI transport (SFTP + MinIO/S3)
+# EDI validation / transport (HIPAA X12 + SFTP + MinIO/S3)
+pyx12==4.0.0
 paramiko==3.5.1
 boto3==1.38.0
