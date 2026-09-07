@@ -6,6 +6,7 @@ from typing import Any
 
 import pyx12.params
 import pyx12.x12n_document
+from apps.edi.utils.required_claim_data import x12_required_data_errors
 
 
 def validate_with_pyx12(raw_x12: str) -> dict[str, Any]:
@@ -50,8 +51,11 @@ def validate_with_pyx12(raw_x12: str) -> dict[str, Any]:
         except json.JSONDecodeError:
             structured = {"raw": raw_json}
 
+    required_errors = x12_required_data_errors(raw_x12)
+    if required_errors:
+        structured = {"pyx12": structured, "colorado_required_data": required_errors}
     return {
-        "valid": bool(valid),
+        "valid": bool(valid) and not required_errors,
         "local_999": ack_stream.getvalue() or None,
         "local_999_is_state_acknowledgment": False,
         "errors": structured,

@@ -22,28 +22,20 @@ from apps.edi.models import EDIFile, EDIFileTransferLog, SFTPCredentials, SFTPDi
 from apps.edi.utils.s3_client import upload_bytes_to_s3
 from apps.edi.utils.sftp_client import upload_bytes_via_sftp
 from apps.edi.utils.service import mark_edi_file_uploaded
+from apps.edi.utils.pyx12_preflight import assert_pyx12_valid
 
 logger = logging.getLogger(__name__)
 
-# HCPF Edifecs MFT paths — confirmed via ops on 2026-09-07.
-#
-# Edifecs MFT places 999/TA1 acks in the SAME folder we drop 837P files into
-# (Organizational/Incoming/fromedifecs/…).  Both send and receive therefore
-# share one folder.  Previous guesses are kept below for rollback reference.
-#
-# Previous guesses (all wrong):
-#   "Outgoing/edifecs.stco.hosted/toedifecs"
-#   "Organizational/Outgoing/edifecs.stco.hosted/toedifecs"
-#   "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"  ← SEND only
-HCPF_837P_SEND_PATH = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
-# 999/TA1 acks land in the SAME folder as outbound 837P.
-HCPF_ACK_RECEIVE_PATH = HCPF_837P_SEND_PATH
+# HCPF MFT guide and live directory listing: outbound claims go to ToEdifecs;
+# received acknowledgments are retrieved from FromEdifecs.
+HCPF_837P_SEND_PATH = "Organizational/Outgoing/edifecs.stco.hosted/toedifecs"
+HCPF_ACK_RECEIVE_PATH = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
 
 
 def sync_hcpf_directory_paths(*, credentials) -> int:
     """
     Point every active Edifecs directory to the confirmed send/receive path.
-    Both outbound (837P) and inbound (999/277/835) share the same MFT folder.
+    Keep outbound claims separate from incoming acknowledgments.
     Safe to call on every upload or poll — uses update() for atomicity.
     """
     if credentials is None:
@@ -275,6 +267,8 @@ def queue_edi_file_upload(*, edi_file_id, credentials_id=None, async_mode=False)
     )
     attempt = (last_attempt or 0) + 1
 
+    assert_pyx12_valid(read_edi_file_bytes(edi_file).decode("utf-8"))
+
     edi_file.status = EDIFileStatus.UPLOAD_QUEUED
     edi_file.save(update_fields=["status", "updated_at"])
 
@@ -369,6 +363,7 @@ def run_edi_file_upload(*, edi_file_id, attempt, task_id=None, credentials_id=No
             task_id=task_id,
         )
         try:
+            assert_pyx12_valid(data.decode("utf-8"))
             remote_sftp = upload_bytes_via_sftp(
                 credentials=credentials,
                 remote_dir=send_path,

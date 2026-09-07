@@ -14,6 +14,7 @@ from apps.edi.choices import EDIFileStatus, TransactionType, TransferChannel
 from apps.edi.models import EDIFile, EDIFileTransferLog
 from apps.edi.utils.handler import Generate837PHandler
 from apps.edi.utils.pyx12_preflight import validate_with_pyx12
+from apps.edi.utils.required_claim_data import billing_address_errors, subscriber_errors
 from apps.nemt_trip.models import NemtTrip
 from apps.patient.models import Patient
 from apps.provider_billing_profile.models import ProviderBillingProfile
@@ -90,6 +91,20 @@ class Command(BaseCommand):
             raise CommandError("Trading partner receiver mismatch")
         if len(tin) != 9:
             raise CommandError("Billing TIN must contain exactly 9 digits")
+        member_dob = _date("OPS_MEMBER_DOB")
+        member_gender = _env("OPS_MEMBER_GENDER").upper()
+        data_errors = subscriber_errors(member_dob, member_gender) + billing_address_errors({
+            field: getattr(provider, field, None)
+            for field in ("address_line_1", "city", "state", "zip")
+        })
+        if data_errors:
+            raise CommandError("; ".join(data_errors))
+        existing_patient = Patient.objects.filter(medicaid_member_id=member_id).first()
+        if existing_patient is not None and (
+            existing_patient.date_of_birth != member_dob
+            or (existing_patient.gender or "").upper() != member_gender
+        ):
+            raise CommandError("Existing member demographics differ; verify and update the patient record before preparation")
         if outbound < 1 or return_miles < 0 or outbound > 52 or return_miles > 52:
             raise CommandError("Per-leg mileage must be between 0 and 52, with outbound at least 1")
 
@@ -118,7 +133,10 @@ class Command(BaseCommand):
             with transaction.atomic():
                 patient, created = Patient.objects.get_or_create(
                     medicaid_member_id=member_id,
-                    defaults={"first_name": member_first, "last_name": member_last, "is_active": True},
+                    defaults={
+                        "first_name": member_first, "last_name": member_last,
+                        "date_of_birth": member_dob, "gender": member_gender, "is_active": True,
+                    },
                 )
                 if not created and (
                     (patient.first_name or "").strip().casefold() != member_first.casefold()

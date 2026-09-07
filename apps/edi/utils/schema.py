@@ -14,6 +14,7 @@ Important rules:
 """
 
 from apps.edi.utils.envelope import DEFAULT_ENVELOPE
+from apps.edi.utils.required_claim_data import billing_address_errors, subscriber_errors
 
 CO_RECEIVER_ID = "COMEDASSISTPROG"
 CO_RECEIVER_NAME = "COLORADO MEDICAL ASSISTANCE PROGRAM"
@@ -120,6 +121,11 @@ def build_edi_content(payload: dict) -> list[str]:
         st02 = claim["st02"]
         provider = claim["provider"]
         patient = claim["patient"]
+        errors = billing_address_errors(provider) + subscriber_errors(
+            patient.get("date_of_birth"), patient.get("gender")
+        )
+        if errors:
+            raise ValueError("; ".join(errors))
         st_start = len(edi_content)
 
         edi_content.append(_seg(envelope, "ST", "837", st02, gs08))
@@ -272,10 +278,7 @@ def build_edi_content(payload: dict) -> list[str]:
 
         dob = (patient.get("date_of_birth") or "").strip()
         gender = (patient.get("gender") or "").strip().upper()
-        if dob or gender:
-            edi_content.append(
-                _seg(envelope, "DMG", "D8" if dob else "", dob, gender or "U")
-            )
+        edi_content.append(_seg(envelope, "DMG", "D8", dob, gender))
 
         edi_content.append(
             _seg(

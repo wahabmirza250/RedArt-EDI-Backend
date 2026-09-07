@@ -39,8 +39,8 @@ def _payload(*, tax_id="123456789", outbound=50, return_miles=50):
                 "patient": {
                     "first_name": "Jane",
                     "last_name": "Doe",
-                    "date_of_birth": "",
-                    "gender": "",
+                    "date_of_birth": "19800101",
+                    "gender": "F",
                     "medicaid_member_id": "A1234567",
                     "address_line_1": "",
                     "city": "",
@@ -97,6 +97,7 @@ def test_atypical_provider_shape_passes_pyx12():
     assert "NM1*85*2*TEST TRANSPORTATION LLC*****XX*9000000001" not in x12
     assert "SV1*HC:S0215*274.00*UN*100*41**1~" in x12
     assert "CLM*TESTCLAIM1*298.30***41:B:1*Y*A*Y*Y~" in x12
+    assert "DMG*D8*19800101*F~" in x12
 
 
 def test_atypical_provider_without_real_tax_id_is_blocked():

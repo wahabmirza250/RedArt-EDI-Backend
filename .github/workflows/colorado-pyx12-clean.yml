@@ -23,8 +23,12 @@ jobs:
       - name: Run synthetic Colorado pyx12 tests
         env:
           DJANGO_SETTINGS_MODULE: redartdigital.settings.local
-        run: pytest -q apps/edi/tests_pyx12_preflight.py
+        run: pytest -q apps/edi/tests_pyx12_preflight.py apps/edi/tests_receiver_requirements.py
       - name: Import guarded preparation command
         env:
           DJANGO_SETTINGS_MODULE: redartdigital.settings.local
         run: python manage.py help prepare_hcpf_one_shot >/dev/null
+      - name: Check upload guard and directional mailbox paths
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: python manage.py test apps.edi.tests.ReceiverUploadGuardTests apps.edi.tests.HcpfSftpPathSwapTests --noinput

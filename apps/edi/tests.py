@@ -708,21 +708,40 @@ class EDI999ImportAPITests(EDIFixturesMixin, AuthAPITestCase):
         self.assertEqual(len(isa_line), 106, f"ISA length mismatch: {len(isa_line)}")
 
 
+class ReceiverUploadGuardTests(TestCase):
+    def test_invalid_saved_file_cannot_be_queued_or_create_transfer_logs(self):
+        from apps.edi.tests_pyx12_preflight import _payload
+        from apps.edi.utils.schema import build_edi_content, render_edi_file
+        from apps.edi.utils.upload import queue_edi_file_upload
+
+        segments = build_edi_content(_payload())
+        segments = [s for s in segments if not s.startswith("DMG*")]
+        start = next(i for i, s in enumerate(segments) if s.startswith("ST*"))
+        end = next(i for i, s in enumerate(segments) if s.startswith("SE*"))
+        segments[end] = f"SE*{end - start + 1}*0001~"
+        edi_file = EDIFile.objects.create(
+            filename="synthetic-invalid.x12", content=render_edi_file(segments),
+            status=EDIFileStatus.GENERATED,
+        )
+        with self.assertRaisesRegex(ValueError, "DMG"):
+            queue_edi_file_upload(edi_file_id=edi_file.id)
+        edi_file.refresh_from_db()
+        self.assertEqual(edi_file.status, EDIFileStatus.GENERATED)
+        self.assertFalse(EDIFileTransferLog.objects.filter(edi_file=edi_file).exists())
+
+
 class HcpfSftpPathSwapTests(TestCase):
     """
-    Confirmed 2026-09-07: Edifecs MFT drops 999 acks in the SAME folder
-    we send 837P to (Organizational/Incoming/fromedifecs/…).
-    Both SEND and RECEIVE paths are therefore identical.
+    Outgoing claims and incoming acknowledgments use separate MFT folders.
     """
 
     def test_path_constants_confirmed(self):
         from apps.edi.utils.upload import HCPF_837P_SEND_PATH, HCPF_ACK_RECEIVE_PATH
 
         confirmed = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
-        self.assertEqual(HCPF_837P_SEND_PATH, confirmed)
-        # 999 acks arrive in the same folder — both constants must match.
+        self.assertEqual(HCPF_837P_SEND_PATH, "Organizational/Outgoing/edifecs.stco.hosted/toedifecs")
         self.assertEqual(HCPF_ACK_RECEIVE_PATH, confirmed)
-        self.assertEqual(HCPF_837P_SEND_PATH, HCPF_ACK_RECEIVE_PATH)
+        self.assertNotEqual(HCPF_837P_SEND_PATH, HCPF_ACK_RECEIVE_PATH)
 
     def test_sync_updates_stale_edifecs_directory_paths(self):
         from apps.edi.models import SFTPCredentials, SFTPDirectory
@@ -754,7 +773,7 @@ class HcpfSftpPathSwapTests(TestCase):
             credentials=cred,
             name="stale outbound",
             purpose="OUTBOUND_837P",
-            sending_path="Organizational/Outgoing/edifecs.stco.hosted/toedifecs",
+            sending_path="Organizational/Incoming/fromedifecs/edifecs.stco.hosted",
             receiving_path="Organizational/Incoming/fromedifecs/edifecs.stco.hosted",
             is_active=True,
         )
