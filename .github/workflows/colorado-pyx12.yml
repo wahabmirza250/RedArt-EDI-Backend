@@ -26,3 +26,7 @@ jobs:
         run: pytest -q apps/edi/tests_pyx12_preflight.py
       - name: Compile guarded one-shot command
         run: python -m py_compile apps/edi/management/commands/submit_hcpf_one_shot.py
+      - name: Import guarded command through Django
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: python manage.py help submit_hcpf_one_shot >/dev/null
