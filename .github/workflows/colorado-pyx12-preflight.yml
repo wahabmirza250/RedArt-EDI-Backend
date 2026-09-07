@@ -6,18 +6,12 @@ on:
       - feature/colorado-pyx12-preflight
     paths:
       - "requirements.txt"
-      - "apps/edi/utils/pyx12_validation.py"
-      - "apps/edi/utils/sftp_client.py"
-      - "apps/edi/utils/schema.py"
-      - "apps/edi/tests_pyx12_preflight.py"
+      - "apps/edi/**"
       - ".github/workflows/colorado-pyx12-preflight.yml"
   pull_request:
     paths:
       - "requirements.txt"
-      - "apps/edi/utils/pyx12_validation.py"
-      - "apps/edi/utils/sftp_client.py"
-      - "apps/edi/utils/schema.py"
-      - "apps/edi/tests_pyx12_preflight.py"
+      - "apps/edi/**"
       - ".github/workflows/colorado-pyx12-preflight.yml"
 
 jobs:
@@ -41,3 +35,8 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: redartdigital.settings.local
         run: python -m unittest apps.edi.tests_pyx12_preflight -v
+
+      - name: Run existing EDI regression suite
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: python manage.py test apps.edi --verbosity 1
