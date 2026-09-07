@@ -20,8 +20,8 @@ def _payload(*, tax_id="123456789", outbound=50, return_miles=50):
             "repetition_separator": "^",
         },
         "trading_partner": {
-            "name": "REDART TEST SUBMITTER",
-            "sender_id": "89513013",
+            "name": "TEST EDI SUBMITTER",
+            "sender_id": "12345678",
             "receiver_id": "COMEDASSISTPROG",
             "contact_name": "EDI TEST",
             "contact_phone": "3035550100",
@@ -31,17 +31,17 @@ def _payload(*, tax_id="123456789", outbound=50, return_miles=50):
         "claims": [
             {
                 "claim_id": 1,
-                "claim_number": "TESTJANA1",
+                "claim_number": "TESTCLAIM1",
                 "st02": "0001",
                 "diagnosis_code": "R68.89",
                 "place_of_service": "41",
                 "total_charge": f"{24.30 + mileage_charge:.2f}",
                 "patient": {
-                    "first_name": "Jana",
-                    "last_name": "Dunn",
+                    "first_name": "Jane",
+                    "last_name": "Doe",
                     "date_of_birth": "",
                     "gender": "",
-                    "medicaid_member_id": "M182191",
+                    "medicaid_member_id": "A1234567",
                     "address_line_1": "",
                     "city": "",
                     "state": "",
@@ -49,17 +49,17 @@ def _payload(*, tax_id="123456789", outbound=50, return_miles=50):
                     "phone": "",
                 },
                 "provider": {
-                    "legal_name": "TEST LONDON TRANSPORTATION LLC",
-                    "billing_name": "TEST LONDON TRANSPORTATION LLC",
+                    "legal_name": "TEST TRANSPORTATION LLC",
+                    "billing_name": "TEST TRANSPORTATION LLC",
                     "is_atypical": True,
                     "npi": "",
-                    "medicaid_provider_id": "9000211959",
+                    "medicaid_provider_id": "9000000001",
                     "taxonomy_code": "",
                     "tax_id": tax_id,
-                    "address_line_1": "1120 W OXFORD AVE",
-                    "city": "ENGLEWOOD",
+                    "address_line_1": "100 TEST AVE",
+                    "city": "DENVER",
                     "state": "CO",
-                    "zip": "80110",
+                    "zip": "80202",
                     "phone": "",
                 },
                 "driver": {"first_name": "", "last_name": ""},
@@ -86,18 +86,18 @@ def _payload(*, tax_id="123456789", outbound=50, return_miles=50):
     }
 
 
-def test_atypical_london_shape_passes_pyx12():
+def test_atypical_provider_shape_passes_pyx12():
     x12 = render_edi_file(build_edi_content(_payload()))
     result = validate_with_pyx12(x12)
     assert result["valid"] is True, result["errors"]
 
-    assert "NM1*85*2*TEST LONDON TRANSPORTATION LLC~" in x12
+    assert "NM1*85*2*TEST TRANSPORTATION LLC~" in x12
     assert "REF*EI*123456789~" in x12
     assert "NM1*PR*2*COLORADO MEDICAL ASSISTANCE PROGRAM*****PI*CO_TXIX~" in x12
-    assert x12.index("REF*G2*9000211959~") > x12.index("NM1*PR*")
-    assert "NM1*85*2*TEST LONDON TRANSPORTATION LLC*****XX*9000211959" not in x12
+    assert x12.index("REF*G2*9000000001~") > x12.index("NM1*PR*")
+    assert "NM1*85*2*TEST TRANSPORTATION LLC*****XX*9000000001" not in x12
     assert "SV1*HC:S0215*274.00*UN*100*41**1~" in x12
-    assert "CLM*TESTJANA1*298.30***41:B:1*Y*A*Y*Y~" in x12
+    assert "CLM*TESTCLAIM1*298.30***41:B:1*Y*A*Y*Y~" in x12
 
 
 def test_atypical_provider_without_real_tax_id_is_blocked():
