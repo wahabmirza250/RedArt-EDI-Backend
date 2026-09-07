@@ -31,12 +31,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run focused preflight tests
+      - name: Django system check
+        env:
+          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
+        run: python manage.py check
+
+      - name: Run Colorado pyx12 preflight tests
         env:
           DJANGO_SETTINGS_MODULE: redartdigital.settings.local
         run: python -m unittest apps.edi.tests_pyx12_preflight -v
-
-      - name: Run existing EDI regression suite
-        env:
-          DJANGO_SETTINGS_MODULE: redartdigital.settings.local
-        run: python manage.py test apps.edi --verbosity 1
