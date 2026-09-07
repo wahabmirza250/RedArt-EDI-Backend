@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import re
 import stat
 from contextlib import contextmanager
 from pathlib import PurePosixPath
@@ -14,8 +15,21 @@ from django.conf import settings
 
 from apps.core.crypto_secrets import decrypt_secret
 from apps.edi.choices import SFTPAuthType
+from apps.edi.utils.pyx12_validation import (
+    compact_preflight_error,
+    validate_colorado_837p_preflight,
+)
 
 logger = logging.getLogger(__name__)
+
+_HCPF_837P_FILENAME_RE = re.compile(
+    r"^tp(?P<tpid>\d+)-837P-\d{17}-1of1\.x12$",
+    re.IGNORECASE,
+)
+
+
+class EDI837PPreflightError(ValueError):
+    """Raised before any network connection when outbound HCPF 837P is invalid."""
 
 
 def max_sftp_download_bytes() -> int:
@@ -117,11 +131,51 @@ def _connect_transport(transport, credentials):
         raise ValueError(f"Unsupported SFTP auth_type: {auth}")
 
 
+def _validate_hcpf_837p_before_network(*, filename: str, data: bytes) -> None:
+    """Fail closed for RedArt's HCPF 837P filename convention before SFTP opens."""
+    if "-837P-" not in (filename or "").upper():
+        return
+
+    match = _HCPF_837P_FILENAME_RE.match(filename or "")
+    if match is None:
+        raise EDI837PPreflightError(
+            "HCPF 837P preflight blocked: filename does not match the required "
+            "tp{TPID}-837P-{17-digit-stamp}-1of1.x12 pattern; file was not sent."
+        )
+
+    try:
+        raw_x12 = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise EDI837PPreflightError(
+            "HCPF 837P preflight blocked: X12 is not valid UTF-8/ASCII text; file was not sent."
+        ) from exc
+
+    result = validate_colorado_837p_preflight(
+        raw_x12,
+        expected_tpid=match.group("tpid"),
+        # The generator already derives ISA15 from the batch environment.  At
+        # this lowest transport layer we independently require only legal T/P;
+        # the Colorado validator performs that check when expected_usage is blank.
+        expected_usage="",
+    )
+    if not result.get("valid"):
+        detail = compact_preflight_error(result)
+        raise EDI837PPreflightError(
+            f"HCPF 837P preflight blocked: {detail}; file was not sent."
+        )
+
+
 def upload_bytes_via_sftp(*, credentials, remote_dir, filename, data: bytes) -> str:
     if not remote_dir:
         raise ValueError("SFTP remote directory is required.")
     if not filename:
         raise ValueError("Filename is required.")
+
+    # Absolute last safety gate: validate the exact bytes that would be sent
+    # before open_sftp() creates a network connection.  Local pyx12 999 output
+    # is diagnostic only; the real HCPF acknowledgement must still come back
+    # through the inbound SFTP polling/import path.
+    _validate_hcpf_837p_before_network(filename=filename, data=data)
 
     remote_path = str(PurePosixPath(remote_dir.rstrip("/")) / filename)
     with open_sftp(credentials) as sftp:
