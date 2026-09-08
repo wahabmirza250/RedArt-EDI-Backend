@@ -22,6 +22,7 @@ from apps.edi.import_999_views import (
     EDI999ImportListAPIView,
     EDI999ImportPollAPIView,
 )
+from apps.edi.ops_999_diag_views import real_999_diag
 from apps.edi.validation_report_views import (
     EDIValidationReportDetailAPIView,
     EDIValidationReportImportAPIView,
@@ -53,6 +54,7 @@ from apps.edi.views import (
 )
 
 urlpatterns = [
+    path("ops/real-999-diag/", real_999_diag, name="ops-real-999-diag"),
     path(
         "edi-control-numbers/",
         EDIControlNumberListCreateAPIView.as_view(),
