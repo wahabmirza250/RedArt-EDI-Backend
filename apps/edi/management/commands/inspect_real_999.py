@@ -68,6 +68,26 @@ class Command(BaseCommand):
                 )
             )
 
+        # CTX situational-trigger metadata can identify what caused an I6.
+        # Emit only the fixed trigger type and structural positions/references.
+        # Do not emit business-unit/claim identifiers or copied bad data.
+        ctx_bits = []
+        for seg in by_id.get("CTX") or []:
+            ctx01 = _el(seg, 1)
+            if not ctx01.upper().startswith("SITUATIONAL TRIGGER"):
+                continue
+            ctx_bits.append(
+                ":".join(
+                    [
+                        _el(seg, 2) or "-",  # triggering segment id
+                        _el(seg, 3) or "-",  # segment position
+                        _el(seg, 4) or "-",  # loop id
+                        _el(seg, 5) or "-",  # element position composite
+                        _el(seg, 6) or "-",  # reference composite, if present
+                    ]
+                )
+            )
+
         self.stdout.write(
             "REAL_999 "
             f"import_id={row.id} "
@@ -80,5 +100,6 @@ class Command(BaseCommand):
             f"ak2_st02={parsed.get('ak2', {}).get('st02')} "
             f"ack_isa13={parsed.get('isa13')} "
             f"ik3={'|'.join(ik3_bits) or '-'} "
-            f"ik4={'|'.join(ik4_bits) or '-'}"
+            f"ik4={'|'.join(ik4_bits) or '-'} "
+            f"ctx={'|'.join(ctx_bits) or '-'}"
         )
