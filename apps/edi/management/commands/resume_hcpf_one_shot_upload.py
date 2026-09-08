@@ -74,11 +74,17 @@ class Command(BaseCommand):
         if s3_log is None:
             raise CommandError("Matching S3 audit log is missing; refusing to alter attempt state")
 
-        run_edi_file_upload(
-            edi_file_id=edi_file.id,
-            attempt=sftp_log.attempt,
-            task_id="ops-one-shot-resume",
-        )
+        try:
+            run_edi_file_upload(
+                edi_file_id=edi_file.id,
+                attempt=sftp_log.attempt,
+                task_id="ops-one-shot-resume",
+            )
+        except Exception as exc:
+            message = str(exc).replace("\n", " ")[:300]
+            raise CommandError(
+                f"Transport execution failed: {type(exc).__name__}: {message}"
+            ) from exc
 
         edi_file.refresh_from_db()
         sftp_log.refresh_from_db()
