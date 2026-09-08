@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import hmac
 import os
+import subprocess
+import sys
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-
-from apps.edi.models import EDI999Import
-from apps.edi.utils.sftp_client import download_bytes_via_sftp
-from apps.edi.utils.x12 import parse_999
 
 
 @require_GET
@@ -27,34 +25,59 @@ def real_999_diag(request):
         response["Cache-Control"] = "no-store"
         return response
 
-    row = (
-        EDI999Import.objects.select_related("credentials")
-        .filter(pk=import_id, is_active=True)
-        .first()
-    )
-    if row is None or not row.credentials_id or not row.remote_path:
-        response = JsonResponse({"detail": "999 import unavailable"}, status=404)
+    mapping = {
+        "POSTGRES_DB": "DIAG_WORKER_POSTGRES_DB",
+        "POSTGRES_HOST": "DIAG_WORKER_POSTGRES_HOST",
+        "POSTGRES_PASSWORD": "DIAG_WORKER_POSTGRES_PASSWORD",
+        "POSTGRES_PORT": "DIAG_WORKER_POSTGRES_PORT",
+        "POSTGRES_SSLMODE": "DIAG_WORKER_POSTGRES_SSLMODE",
+        "POSTGRES_USER": "DIAG_WORKER_POSTGRES_USER",
+        "DJANGO_SECRET_KEY": "DIAG_WORKER_DJANGO_SECRET_KEY",
+        "DJANGO_SETTINGS_MODULE": "DIAG_WORKER_DJANGO_SETTINGS_MODULE",
+    }
+    env = os.environ.copy()
+    missing = []
+    for target, source in mapping.items():
+        value = os.environ.get(source, "")
+        if value:
+            env[target] = value
+        elif target not in ("POSTGRES_SSLMODE", "DJANGO_SETTINGS_MODULE"):
+            missing.append(source)
+
+    if missing:
+        response = JsonResponse({"detail": "worker diagnostic wiring incomplete"}, status=503)
         response["Cache-Control"] = "no-store"
         return response
 
-    data = download_bytes_via_sftp(
-        credentials=row.credentials,
-        remote_path=row.remote_path,
+    proc = subprocess.run(
+        [sys.executable, "manage.py", "inspect_real_999", "--import-id", str(import_id)],
+        cwd="/app",
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=30,
     )
-    parsed = parse_999(data.decode("utf-8", errors="replace"))
+    if proc.returncode != 0:
+        response = JsonResponse({"detail": "worker diagnostic failed"}, status=502)
+        response["Cache-Control"] = "no-store"
+        return response
 
-    response = JsonResponse(
-        {
-            "import_id": row.id,
-            "status": parsed.get("status"),
-            "ik5": parsed.get("ik5_code"),
-            "ak9": parsed.get("ak9_code"),
-            "ak1_functional_id": parsed.get("ak1", {}).get("functional_id"),
-            "ak1_group_control": parsed.get("ak1", {}).get("group_control"),
-            "ak2_transaction_set": parsed.get("ak2", {}).get("transaction_set"),
-            "ak2_st02": parsed.get("ak2", {}).get("st02"),
-            "ack_isa13": parsed.get("isa13"),
-        }
-    )
+    line = ""
+    for candidate in (proc.stdout or "").splitlines():
+        if candidate.startswith("REAL_999 "):
+            line = candidate.strip()
+            break
+    if not line:
+        response = JsonResponse({"detail": "999 diagnostic output missing"}, status=502)
+        response["Cache-Control"] = "no-store"
+        return response
+
+    fields = {}
+    for token in line.split()[1:]:
+        if "=" in token:
+            key, value = token.split("=", 1)
+            fields[key] = value
+
+    response = JsonResponse(fields)
     response["Cache-Control"] = "no-store"
     return response
