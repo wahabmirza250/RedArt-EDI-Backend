@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.edi.models import EDI999Import
+from apps.edi.models import EDI999Import, EDIFile
 from apps.edi.utils.sftp_client import download_bytes_via_sftp
 from apps.edi.utils.x12 import parse_999, parse_x12
 
@@ -21,6 +21,45 @@ def _original_837_path(ack_path: str) -> str:
     return ""
 
 
+def _safe_outbound_structure(raw_text: str) -> dict:
+    outbound = parse_x12(raw_text or "")
+    if not outbound:
+        return {}
+    isa = next((seg for seg in outbound if seg.get("id") == "ISA"), None)
+    gs = next((seg for seg in outbound if seg.get("id") == "GS"), None)
+    st = next((seg for seg in outbound if seg.get("id") == "ST"), None)
+    sbrs = [seg for seg in outbound if seg.get("id") == "SBR"]
+    return {
+        "segments": ",".join(seg.get("id") or "?" for seg in outbound[:50]),
+        "isa13": _el(isa, 13) or "-",
+        "gs06": _el(gs, 6) or "-",
+        "st02": _el(st, 2) or "-",
+        "sbr": "|".join(
+            ":".join([_el(seg, 1) or "-", _el(seg, 2) or "-", _el(seg, 9) or "-"])
+            for seg in sbrs
+        ) or "-",
+    }
+
+
+def _find_db_outbound(group_control: str):
+    if not group_control:
+        return None
+    candidates = (
+        EDIFile.objects.filter(is_active=True)
+        .exclude(content__isnull=True)
+        .exclude(content="")
+        .order_by("-id")[:250]
+    )
+    for edi_file in candidates:
+        try:
+            structure = _safe_outbound_structure(edi_file.content or "")
+        except Exception:
+            continue
+        if structure.get("gs06") == group_control:
+            return edi_file, structure
+    return None
+
+
 class Command(BaseCommand):
     help = "Read-only inspection of one imported 999. Prints only non-PHI acknowledgement metadata."
 
@@ -38,94 +77,52 @@ class Command(BaseCommand):
         if not row.credentials_id or not row.remote_path:
             raise CommandError("999 import row is missing credentials or remote path")
 
-        data = download_bytes_via_sftp(
-            credentials=row.credentials,
-            remote_path=row.remote_path,
-        )
+        data = download_bytes_via_sftp(credentials=row.credentials, remote_path=row.remote_path)
         if not data:
             raise CommandError("Remote 999 file is empty")
 
         parsed = parse_999(data.decode("utf-8", errors="replace"))
         by_id = parsed.get("by_id") or {}
 
-        ik3_bits = []
-        for seg in by_id.get("IK3") or []:
-            ik3_bits.append(
-                ":".join(
-                    [
-                        _el(seg, 1) or "-",
-                        _el(seg, 2) or "-",
-                        _el(seg, 3) or "-",
-                        _el(seg, 4) or "-",
-                    ]
-                )
-            )
-
-        ik4_bits = []
-        for seg in by_id.get("IK4") or []:
-            ik4_bits.append(
-                ":".join(
-                    [
-                        _el(seg, 1) or "-",
-                        _el(seg, 2) or "-",
-                        _el(seg, 3) or "-",
-                    ]
-                )
-            )
-
+        ik3_bits = [
+            ":".join([_el(seg, 1) or "-", _el(seg, 2) or "-", _el(seg, 3) or "-", _el(seg, 4) or "-"])
+            for seg in by_id.get("IK3") or []
+        ]
+        ik4_bits = [
+            ":".join([_el(seg, 1) or "-", _el(seg, 2) or "-", _el(seg, 3) or "-"])
+            for seg in by_id.get("IK4") or []
+        ]
         ctx_bits = []
         for seg in by_id.get("CTX") or []:
-            ctx01 = _el(seg, 1)
-            if not ctx01.upper().startswith("SITUATIONAL TRIGGER"):
+            if not _el(seg, 1).upper().startswith("SITUATIONAL TRIGGER"):
                 continue
             ctx_bits.append(
-                ":".join(
-                    [
-                        _el(seg, 2) or "-",
-                        _el(seg, 3) or "-",
-                        _el(seg, 4) or "-",
-                        _el(seg, 5) or "-",
-                        _el(seg, 6) or "-",
-                    ]
-                )
+                ":".join([_el(seg, 2) or "-", _el(seg, 3) or "-", _el(seg, 4) or "-", _el(seg, 5) or "-", _el(seg, 6) or "-"])
             )
 
-        outbound_path = _original_837_path(row.remote_path)
         outbound_present = "false"
-        outbound_segment_ids = "-"
-        outbound_isa13 = "-"
-        outbound_gs06 = "-"
-        outbound_st02 = "-"
-        outbound_sbr = "-"
+        outbound_source = "-"
+        outbound_file_id = "-"
+        structure = {}
+
+        outbound_path = _original_837_path(row.remote_path)
         if outbound_path:
             try:
-                raw_837 = download_bytes_via_sftp(
-                    credentials=row.credentials,
-                    remote_path=outbound_path,
-                )
-                outbound = parse_x12(raw_837.decode("utf-8", errors="replace"))
-                if outbound:
+                raw_837 = download_bytes_via_sftp(credentials=row.credentials, remote_path=outbound_path)
+                structure = _safe_outbound_structure(raw_837.decode("utf-8", errors="replace"))
+                if structure:
                     outbound_present = "true"
-                    outbound_segment_ids = ",".join(seg.get("id") or "?" for seg in outbound[:40])
-                    isa = next((seg for seg in outbound if seg.get("id") == "ISA"), None)
-                    gs = next((seg for seg in outbound if seg.get("id") == "GS"), None)
-                    st = next((seg for seg in outbound if seg.get("id") == "ST"), None)
-                    sbrs = [seg for seg in outbound if seg.get("id") == "SBR"]
-                    outbound_isa13 = _el(isa, 13) or "-"
-                    outbound_gs06 = _el(gs, 6) or "-"
-                    outbound_st02 = _el(st, 2) or "-"
-                    outbound_sbr = "|".join(
-                        ":".join(
-                            [
-                                _el(seg, 1) or "-",
-                                _el(seg, 2) or "-",
-                                _el(seg, 9) or "-",
-                            ]
-                        )
-                        for seg in sbrs
-                    ) or "-"
+                    outbound_source = "sftp"
             except Exception:
-                outbound_present = "error"
+                pass
+
+        if not structure:
+            found = _find_db_outbound(parsed.get("ak1", {}).get("group_control") or "")
+            if found:
+                edi_file, structure = found
+                outbound_present = "true"
+                outbound_source = "worker_db"
+                outbound_file_id = str(edi_file.id)
 
         self.stdout.write(
             "REAL_999 "
@@ -142,9 +139,11 @@ class Command(BaseCommand):
             f"ik4={'|'.join(ik4_bits) or '-'} "
             f"ctx={'|'.join(ctx_bits) or '-'} "
             f"outbound_present={outbound_present} "
-            f"outbound_isa13={outbound_isa13} "
-            f"outbound_gs06={outbound_gs06} "
-            f"outbound_st02={outbound_st02} "
-            f"outbound_sbr={outbound_sbr} "
-            f"outbound_segments={outbound_segment_ids}"
+            f"outbound_source={outbound_source} "
+            f"outbound_file_id={outbound_file_id} "
+            f"outbound_isa13={structure.get('isa13', '-')} "
+            f"outbound_gs06={structure.get('gs06', '-')} "
+            f"outbound_st02={structure.get('st02', '-')} "
+            f"outbound_sbr={structure.get('sbr', '-')} "
+            f"outbound_segments={structure.get('segments', '-')}"
         )
