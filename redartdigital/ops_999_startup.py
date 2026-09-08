@@ -39,7 +39,8 @@ def run_once() -> None:
     run_diag = os.environ.get("OPS_RUN_999_DIAG_ON_START") == "1"
     run_prepare = os.environ.get("OPS_RUN_PREPARE_ON_START") == "1"
     run_upload = os.environ.get("OPS_RUN_UPLOAD_ON_START") == "1"
-    if not run_diag and not run_prepare and not run_upload:
+    run_resume_upload = os.environ.get("OPS_RUN_RESUME_UPLOAD_ON_START") == "1"
+    if not run_diag and not run_prepare and not run_upload and not run_resume_upload:
         return
 
     lock_path = "/tmp/redart_real_ops_once.lock"
@@ -66,6 +67,15 @@ def run_once() -> None:
             env=api_env,
             prefixes=("OPS_UPLOADED ",),
             label="OPS_UPLOAD",
+            timeout=90,
+        )
+
+    if run_resume_upload:
+        _run_and_print(
+            [sys.executable, "manage.py", "resume_hcpf_one_shot_upload"],
+            env=api_env,
+            prefixes=("OPS_UPLOADED ",),
+            label="OPS_RESUME_UPLOAD",
             timeout=90,
         )
 
