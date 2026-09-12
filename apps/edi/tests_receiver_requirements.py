@@ -7,10 +7,18 @@ from apps.edi.utils.schema import build_edi_content, render_edi_file
 from apps.edi.utils.pyx12_preflight import validate_with_pyx12
 
 
-@pytest.mark.parametrize("field,value", [("date_of_birth", ""), ("date_of_birth", "19800230"), ("gender", "")])
-def test_generation_blocks_missing_or_invalid_demographics(field, value):
+def test_generation_allows_missing_optional_demographics():
+    """DOB/gender are optional; DMG is omitted when either is absent."""
+    for field in ("date_of_birth", "gender"):
+        payload = deepcopy(_payload())
+        payload["claims"][0]["patient"][field] = ""
+        body = render_edi_file(build_edi_content(payload))
+        assert "DMG*" not in body
+
+
+def test_generation_blocks_invalid_date_of_birth_when_supplied():
     payload = deepcopy(_payload())
-    payload["claims"][0]["patient"][field] = value
+    payload["claims"][0]["patient"]["date_of_birth"] = "19800230"
     with pytest.raises(ValueError, match="Subscriber"):
         build_edi_content(payload)
 
@@ -22,15 +30,15 @@ def test_generation_blocks_missing_billing_postal_code():
         build_edi_content(payload)
 
 
-def test_old_file_without_dmg_fails_even_if_generic_pyx12_allows_it():
+def test_old_file_without_dmg_is_allowed_when_other_required_data_present():
+    """Missing DMG alone must not fail Colorado required-data checks."""
     segments = build_edi_content(_payload())
     segments = [s for s in segments if not s.startswith("DMG*")]
     st = next(i for i, s in enumerate(segments) if s.startswith("ST*"))
     se = next(i for i, s in enumerate(segments) if s.startswith("SE*"))
     segments[se] = f"SE*{se - st + 1}*0001~"
     result = validate_with_pyx12(render_edi_file(segments))
-    assert not result["valid"]
-    assert any("DMG" in error for error in result["errors"]["colorado_required_data"])
+    assert result["valid"]
     assert result["local_999_is_state_acknowledgment"] is False
 
 

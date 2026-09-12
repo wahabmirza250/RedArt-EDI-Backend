@@ -9,10 +9,15 @@ Rules (Colorado Medicaid NEMT):
     - NEVER default/fabricate a missing procedure code
 
   Patient (subscriber):
-    - medicaid_member_id, verified DOB and recorded gender are required
-    - DMG is required for the generated self-subscriber (SBR02=18) flow
+    - medicaid_member_id is required (NM1*IL MI)
+    - DOB and gender are optional; when both are present they may be emitted as DMG
+    - Never fabricate missing demographics
 
   Provider (billing):
+    Both atypical and NPI providers:
+      - address_line_1, city, state, zip required (2010AA N3/N4)
+        Empty N4-03 (postal) is a known HCPF 999 reject (IK4*I9).
+
     Standard NPI provider (is_atypical=False):
       - npi required (NM108=XX, NM109=NPI)
       - tax_id required (REF*EI in 2010AA)
@@ -71,7 +76,8 @@ def _validate_envelope(batch) -> list[str]:
 
 def _validate_patient(patient, claim_label: str) -> list[str]:
     """
-    Require the demographics used by the self-subscriber DMG segment.
+    medicaid_member_id is required. DOB/gender are optional; validate only
+    when supplied (never fabricate DMG demographics).
     """
     errors = []
     errors.extend(f"{claim_label}: {error}" for error in subscriber_errors(
@@ -91,9 +97,12 @@ def _validate_provider(provider, claim_label: str) -> list[str]:
     Standard NPI provider:  npi + tax_id + taxonomy_code required.
     Atypical provider:       medicaid_provider_id required (→ REF*G2); no NPI.
                              XX qualifier is reserved for NPI — never use with a Medicaid ID.
+    Both: full billing address (N3/N4) — empty zip causes HCPF 999 IK4*I9.
     """
     errors = []
     is_atypical = bool(getattr(provider, "is_atypical", False))
+    pid = provider.id
+    # 2010AA N3/N4 — required (HCPF rejects blank N4-03 with IK4*I9).
     errors.extend(f"{claim_label}: {error}" for error in billing_address_errors({
         field: getattr(provider, field, None)
         for field in ("address_line_1", "city", "state", "zip")
@@ -103,26 +112,26 @@ def _validate_provider(provider, claim_label: str) -> list[str]:
         medicaid_pid = (getattr(provider, "medicaid_provider_id", None) or "").strip()
         if not medicaid_pid:
             errors.append(
-                f"{claim_label}: provider {provider.id} is marked atypical but "
+                f"{claim_label}: provider {pid} is marked atypical but "
                 "is missing medicaid_provider_id "
                 "(required for REF*G2 in 2010AA — XX qualifier is NPI-only)."
             )
         npi = (provider.npi or "").strip()
         if npi:
             errors.append(
-                f"{claim_label}: provider {provider.id} is marked atypical but has "
+                f"{claim_label}: provider {pid} is marked atypical but has "
                 "an NPI set. Atypical providers must not have an NPI — never fabricate one."
             )
     else:
         if not (provider.taxonomy_code or "").strip():
             errors.append(
-                f"{claim_label}: provider {provider.id} is missing taxonomy_code "
+                f"{claim_label}: provider {pid} is missing taxonomy_code "
                 "(required for standard NPI billing provider identity)."
             )
         npi = (provider.npi or "").strip()
         if not npi:
             errors.append(
-                f"{claim_label}: provider {provider.id} is missing NPI "
+                f"{claim_label}: provider {pid} is missing NPI "
                 "(required for standard 837P billing provider NM108=XX). "
                 "If this is an atypical provider, set is_atypical=True."
             )
@@ -130,7 +139,7 @@ def _validate_provider(provider, claim_label: str) -> list[str]:
         tax_id = "".join(ch for ch in tax_id_raw if ch.isdigit())
         if not tax_id:
             errors.append(
-                f"{claim_label}: provider {provider.id} is missing tax_id (EIN/TIN). "
+                f"{claim_label}: provider {pid} is missing tax_id (EIN/TIN). "
                 "REF*EI is required in 837P 2010AA when NM108=XX (NPI provider). "
                 "Set tax_id via the provider API — never hard-code it."
             )

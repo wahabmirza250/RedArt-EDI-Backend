@@ -120,7 +120,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# Admin / local display in Pakistan Standard Time (UTC+5). DB still stores UTC (USE_TZ).
+TIME_ZONE = "Asia/Karachi"
 USE_I18N = True
 USE_TZ = True
 
