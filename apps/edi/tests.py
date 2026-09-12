@@ -710,24 +710,38 @@ class EDI999ImportAPITests(EDIFixturesMixin, AuthAPITestCase):
 
 class ReceiverUploadGuardTests(TestCase):
     def test_invalid_saved_file_cannot_be_queued_or_create_transfer_logs(self):
+        """Upload must fail closed on missing billing N403 (zip), not on optional DMG."""
         from apps.edi.tests_pyx12_preflight import _payload
         from apps.edi.utils.schema import build_edi_content, render_edi_file
         from apps.edi.utils.upload import queue_edi_file_upload
+
+        body = render_edi_file(build_edi_content(_payload())).replace(
+            "N4*DENVER*CO*80202~", "N4*DENVER*CO~"
+        )
+        edi_file = EDIFile.objects.create(
+            filename="synthetic-invalid.x12",
+            content=body,
+            status=EDIFileStatus.GENERATED,
+        )
+        with self.assertRaisesRegex(ValueError, "N403|zip|pyx12"):
+            queue_edi_file_upload(edi_file_id=edi_file.id)
+        edi_file.refresh_from_db()
+        self.assertEqual(edi_file.status, EDIFileStatus.GENERATED)
+        self.assertFalse(EDIFileTransferLog.objects.filter(edi_file=edi_file).exists())
+
+    def test_file_without_dmg_can_still_be_queued_preflight(self):
+        """Subscriber DMG is optional — missing DMG alone must not block upload guard."""
+        from apps.edi.tests_pyx12_preflight import _payload
+        from apps.edi.utils.schema import build_edi_content, render_edi_file
+        from apps.edi.utils.pyx12_preflight import assert_pyx12_valid
 
         segments = build_edi_content(_payload())
         segments = [s for s in segments if not s.startswith("DMG*")]
         start = next(i for i, s in enumerate(segments) if s.startswith("ST*"))
         end = next(i for i, s in enumerate(segments) if s.startswith("SE*"))
         segments[end] = f"SE*{end - start + 1}*0001~"
-        edi_file = EDIFile.objects.create(
-            filename="synthetic-invalid.x12", content=render_edi_file(segments),
-            status=EDIFileStatus.GENERATED,
-        )
-        with self.assertRaisesRegex(ValueError, "DMG"):
-            queue_edi_file_upload(edi_file_id=edi_file.id)
-        edi_file.refresh_from_db()
-        self.assertEqual(edi_file.status, EDIFileStatus.GENERATED)
-        self.assertFalse(EDIFileTransferLog.objects.filter(edi_file=edi_file).exists())
+        # Should not raise — DMG is optional.
+        assert_pyx12_valid(render_edi_file(segments))
 
 
 class HcpfSftpPathSwapTests(TestCase):
