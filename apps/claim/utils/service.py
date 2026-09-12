@@ -269,6 +269,20 @@ def validate_claim_for_edi(claim, *, update_status=True):
             errors.append("Trip is missing billing provider.")
         else:
             is_atypical = bool(getattr(provider, "is_atypical", False))
+            if not (provider.address_line_1 or "").strip():
+                errors.append(
+                    "Provider address_line_1 is missing (required for 837P N3)."
+                )
+            if not (provider.city or "").strip():
+                errors.append("Provider city is missing (required for 837P N4-01).")
+            if not (provider.state or "").strip():
+                errors.append("Provider state is missing (required for 837P N4-02).")
+            zip_digits = "".join(ch for ch in str(provider.zip or "") if ch.isdigit())
+            if len(zip_digits) < 5:
+                errors.append(
+                    "Provider zip is missing (N4-03 postal code required — "
+                    "empty zip is rejected by HCPF 999 IK4*I9)."
+                )
             if is_atypical:
                 if not (getattr(provider, "medicaid_provider_id", None) or "").strip():
                     errors.append(

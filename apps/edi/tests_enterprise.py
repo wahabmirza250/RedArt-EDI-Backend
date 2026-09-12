@@ -402,6 +402,18 @@ class TestValidationErrors(EnterpriseFixturesMixin, TestCase):
         errors = collect_batch_readiness_errors(batch)
         self.assertTrue(any("tax_id" in e.lower() for e in errors))
 
+    def test_missing_provider_zip_blocked(self):
+        """Empty billing zip must block generate — matches HCPF 999 IK4*I9 on N4-03."""
+        provider = self._make_provider(npi=self.PROVIDER_NPI, tax_id=self.PROVIDER_TAX_ID)
+        provider.zip = ""
+        provider.save(update_fields=["zip", "updated_at"])
+        patient = self._make_patient(medicaid_member_id="ZIPMISSING1")
+        trip = self._make_trip(patient, provider, miles=80)
+        claim = self._make_claim(trip, claim_number="VAL-CLM-ZIP")
+        batch = self._make_batch(self.partner, claim)
+        errors = collect_batch_readiness_errors(batch)
+        self.assertTrue(any("zip" in e.lower() and "n4-03" in e.lower() for e in errors))
+
     def test_missing_procedure_code_blocked(self):
         """Missing procedure_code must produce clear error — never defaulted."""
         trip = self._make_trip(self.patient, self.provider, miles=80)
