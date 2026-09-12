@@ -20,6 +20,10 @@ def _run_and_print(command, *, env, prefixes, label, timeout=30):
         return False
     if proc.returncode != 0:
         print(f"{label}_ERROR command_failed=true returncode={proc.returncode}", flush=True)
+        for line in (proc.stderr or "").splitlines():
+            if line.startswith("CommandError:"):
+                print(f"{label}_DETAIL {line}", flush=True)
+                break
         return False
     found = False
     for line in (proc.stdout or "").splitlines():
@@ -34,7 +38,9 @@ def _run_and_print(command, *, env, prefixes, label, timeout=30):
 def run_once() -> None:
     run_diag = os.environ.get("OPS_RUN_999_DIAG_ON_START") == "1"
     run_prepare = os.environ.get("OPS_RUN_PREPARE_ON_START") == "1"
-    if not run_diag and not run_prepare:
+    run_upload = os.environ.get("OPS_RUN_UPLOAD_ON_START") == "1"
+    run_resume_upload = os.environ.get("OPS_RUN_RESUME_UPLOAD_ON_START") == "1"
+    if not run_diag and not run_prepare and not run_upload and not run_resume_upload:
         return
 
     lock_path = "/tmp/redart_real_ops_once.lock"
@@ -46,8 +52,6 @@ def run_once() -> None:
 
     api_env = os.environ.copy()
 
-    # Explicitly authorized one-claim preparation. This command creates the
-    # local Django claim/batch/837 and runs pyx12, but never uploads to SFTP.
     if run_prepare:
         _run_and_print(
             [sys.executable, "manage.py", "prepare_hcpf_one_shot"],
@@ -57,10 +61,27 @@ def run_once() -> None:
             timeout=45,
         )
 
+    if run_upload:
+        _run_and_print(
+            [sys.executable, "manage.py", "upload_hcpf_one_shot"],
+            env=api_env,
+            prefixes=("OPS_UPLOADED ",),
+            label="OPS_UPLOAD",
+            timeout=90,
+        )
+
+    if run_resume_upload:
+        _run_and_print(
+            [sys.executable, "manage.py", "resume_hcpf_one_shot_upload"],
+            env=api_env,
+            prefixes=("OPS_UPLOADED ",),
+            label="OPS_RESUME_UPLOAD",
+            timeout=90,
+        )
+
     if not run_diag:
         return
 
-    # Inspect API EDI metadata after preparation; no claim/member/provider data.
     _run_and_print(
         [sys.executable, "manage.py", "inspect_recent_edi_files", "--limit", "12"],
         env=api_env,
@@ -68,7 +89,6 @@ def run_once() -> None:
         label="API_EDI_DIAG",
     )
 
-    # Inspect the existing real 999 in the worker's database/SFTP context.
     mapping = {
         "POSTGRES_DB": "DIAG_WORKER_POSTGRES_DB",
         "POSTGRES_HOST": "DIAG_WORKER_POSTGRES_HOST",
