@@ -9,8 +9,9 @@ Rules (Colorado Medicaid NEMT):
     - NEVER default/fabricate a missing procedure code
 
   Patient (subscriber):
-    - medicaid_member_id, verified DOB and recorded gender are required
-    - DMG is required for the generated self-subscriber (SBR02=18) flow
+    - medicaid_member_id is required (NM1*IL MI)
+    - DOB and gender are optional; when both are present they may be emitted as DMG
+    - Never fabricate missing demographics
 
   Provider (billing):
     Both atypical and NPI providers:
@@ -75,7 +76,8 @@ def _validate_envelope(batch) -> list[str]:
 
 def _validate_patient(patient, claim_label: str) -> list[str]:
     """
-    Require the demographics used by the self-subscriber DMG segment.
+    medicaid_member_id is required. DOB/gender are optional; validate only
+    when supplied (never fabricate DMG demographics).
     """
     errors = []
     errors.extend(f"{claim_label}: {error}" for error in subscriber_errors(
