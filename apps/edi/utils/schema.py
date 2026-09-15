@@ -10,6 +10,8 @@ Important rules:
   - Colorado Medicaid atypical provider ID is payer-assigned secondary ID
     REF*G2 in 2010BB, after NM1*PR.
   - 2010BA NM108=MI / NM109=Colorado Medicaid member ID.
+  - 2010AB NM1*87 is emitted only when pay_to_address_line_1 is set.
+  - SV101 is HC:PROC[:MOD1[:MOD2[:MOD3[:MOD4]]]] from service-line modifiers.
   - Subscriber DMG is emitted only when verified DOB and gender are both present.
   - ISA is exactly 106 characters including terminator.
 """
@@ -267,6 +269,33 @@ def build_edi_content(payload: dict) -> list[str]:
                 )
             edi_content.append(_seg(envelope, "REF", "EI", tax_id))
 
+        # 2010AB Pay-To Address Name — only when a distinct pay-to street is set.
+        # X222A1 marks NM103-NM109 as Not Used for NM1*87; address is N3/N4 only.
+        pay_to_street = (provider.get("pay_to_address_line_1") or "").strip()
+        if pay_to_street:
+            edi_content.append(_seg(envelope, "NM1", "87", "2"))
+            pay_to_line_2 = (provider.get("pay_to_address_line_2") or "").strip()
+            if pay_to_line_2:
+                edi_content.append(
+                    _seg(envelope, "N3", pay_to_street, pay_to_line_2)
+                )
+            else:
+                edi_content.append(_seg(envelope, "N3", pay_to_street))
+            pay_to_city = (provider.get("pay_to_city") or "").strip()
+            pay_to_state = (provider.get("pay_to_state") or "").strip()
+            pay_to_zip = "".join(
+                ch for ch in str(provider.get("pay_to_zip") or "") if ch.isdigit()
+            )
+            if not pay_to_zip:
+                raise ValueError(
+                    f"Pay-to zip is missing (2010AB N4-03). "
+                    f"Cannot emit incomplete pay-to N4 for claim "
+                    f"{claim.get('claim_number', claim.get('claim_id'))}."
+                )
+            edi_content.append(
+                _seg(envelope, "N4", pay_to_city, pay_to_state, pay_to_zip)
+            )
+
         edi_content.append(_seg(envelope, "HL", "2", str(billing_hl), "22", "0"))
         edi_content.append(
             _seg(envelope, "SBR", "P", "18", "", "", "", "", "", "", "MC")
@@ -357,12 +386,28 @@ def build_edi_content(payload: dict) -> list[str]:
 
             units = line.get("units") or 1
             charge = line.get("charge") or "0"
+            modifiers = []
+            for key in ("modifier_1", "modifier_2", "modifier_3", "modifier_4"):
+                mod = (line.get(key) or "").strip().upper()
+                if mod:
+                    modifiers.append(mod)
+            # Also accept a pre-built list from callers/tests.
+            for mod in line.get("modifiers") or []:
+                mod = (mod or "").strip().upper()
+                if mod and mod not in modifiers:
+                    modifiers.append(mod)
+            if len(modifiers) > 4:
+                raise ValueError(
+                    f"Claim {claim.get('claim_number', claim.get('claim_id'))}: "
+                    f"service line {idx} has more than 4 modifiers."
+                )
+            sv101 = cp.join(["HC", proc, *modifiers])
             edi_content.append(_seg(envelope, "LX", str(idx)))
             edi_content.append(
                 _seg(
                     envelope,
                     "SV1",
-                    f"HC{cp}{proc}",
+                    sv101,
                     charge,
                     "UN",
                     units,

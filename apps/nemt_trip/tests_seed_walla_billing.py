@@ -105,15 +105,21 @@ class SeedWallaBillingTests(TestCase):
         }
         self.assertEqual(lines["A0120"].units, 2)
         self.assertEqual(lines["A0120"].charge, Decimal("24.30"))
+        self.assertEqual(lines["A0120"].modifier_1, "76")
         self.assertEqual(lines["S0215"].units, 3)
         self.assertEqual(lines["S0215"].mileage, Decimal("3.25"))
         self.assertEqual(lines["S0215"].charge, Decimal("8.22"))
+        self.assertIsNone(lines["S0215"].modifier_1)
 
         self._seed()
         self.assertEqual(Patient.objects.count(), 1)
         self.assertEqual(NemtTrip.objects.count(), 2)
         self.assertEqual(Claim.objects.count(), 1)
         self.assertEqual(claim.service_lines.filter(is_active=True).count(), 2)
+        claim.refresh_from_db()
+        self.assertEqual(
+            claim.service_lines.get(procedure_code="A0120").modifier_1, "76"
+        )
 
     def test_claim_creation_requires_explicit_authorization(self):
         with self.assertRaisesMessage(CommandError, "--billing-authorized"):
@@ -129,3 +135,14 @@ class SeedWallaBillingTests(TestCase):
         self.assertFalse(Patient.objects.exists())
         self.assertFalse(NemtTrip.objects.exists())
         self.assertFalse(Claim.objects.exists())
+
+    def test_existing_claim_without_modifier_is_backfilled(self):
+        self._seed()
+        claim = Claim.objects.get()
+        line = claim.service_lines.get(procedure_code="A0120")
+        line.modifier_1 = None
+        line.save(update_fields=["modifier_1", "updated_at"])
+
+        self._seed()
+        line.refresh_from_db()
+        self.assertEqual(line.modifier_1, "76")

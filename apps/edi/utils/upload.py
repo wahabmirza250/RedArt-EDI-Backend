@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # HCPF MFT guide and live directory listing: outbound claims go to ToEdifecs;
 # received acknowledgments are retrieved from FromEdifecs.
-HCPF_837P_SEND_PATH = "Organizational/Outgoing/edifecs.stco.hosted/toedifecs"
+HCPF_837P_SEND_PATH = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
 HCPF_ACK_RECEIVE_PATH = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
 
 

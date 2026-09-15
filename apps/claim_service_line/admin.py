@@ -9,6 +9,7 @@ class ClaimServiceLineAdmin(admin.ModelAdmin):
         "id",
         "claim",
         "procedure_code",
+        "modifier_1",
         "from_date",
         "to_date",
         "units",
@@ -20,6 +21,8 @@ class ClaimServiceLineAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "from_date", "created_at")
     search_fields = (
         "procedure_code",
+        "modifier_1",
+        "modifier_2",
         "claim__claim_number",
         "claim__external_id",
     )
@@ -35,6 +38,10 @@ class ClaimServiceLineAdmin(admin.ModelAdmin):
                     "id",
                     "claim",
                     "procedure_code",
+                    "modifier_1",
+                    "modifier_2",
+                    "modifier_3",
+                    "modifier_4",
                     "from_date",
                     "to_date",
                     "units",

@@ -57,9 +57,20 @@ class ProviderBillingProfile(BaseModel):
     country = models.CharField(max_length=50, blank=True, null=True)
     address_line_1 = models.CharField(max_length=500, blank=True, null=True)
     address_line_2 = models.CharField(max_length=500, blank=True, null=True)
+    # Optional 2010AB pay-to loop. Keep separate from physical/service address.
+    pay_to_name = models.CharField(max_length=300, blank=True, null=True)
+    pay_to_address_line_1 = models.CharField(max_length=500, blank=True, null=True)
+    pay_to_address_line_2 = models.CharField(max_length=500, blank=True, null=True)
+    pay_to_city = models.CharField(max_length=50, blank=True, null=True)
+    pay_to_state = models.CharField(max_length=50, blank=True, null=True)
+    pay_to_zip = models.CharField(max_length=50, blank=True, null=True)
     phone = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+
+    def has_pay_to_address(self):
+        """True when a distinct pay-to street address is configured."""
+        return bool((self.pay_to_address_line_1 or "").strip())
 
     class Meta:
         verbose_name = "Provider Billing Profile"

@@ -64,6 +64,23 @@ class ProviderBillingProfileAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Pay-to address (2010AB)",
+            {
+                "fields": (
+                    "pay_to_name",
+                    "pay_to_address_line_1",
+                    "pay_to_address_line_2",
+                    "pay_to_city",
+                    "pay_to_state",
+                    "pay_to_zip",
+                ),
+                "description": (
+                    "Optional. Used only when payment should go to a different "
+                    "address than the physical/service address."
+                ),
+            },
+        ),
+        (
             "Contact",
             {"fields": ("phone", "email")},
         ),

@@ -114,3 +114,49 @@ def test_52_plus_52_round_trip_x12_is_structurally_valid():
     result = validate_with_pyx12(x12)
     assert result["valid"] is True, result["errors"]
     assert "SV1*HC:S0215*284.96*UN*104*41**1~" in x12
+
+
+def test_sv1_includes_service_line_modifiers():
+    payload = _payload()
+    payload["claims"][0]["service_lines"][0]["modifier_1"] = "76"
+    payload["claims"][0]["service_lines"][0]["modifier_2"] = "U1"
+    x12 = render_edi_file(build_edi_content(payload))
+    result = validate_with_pyx12(x12)
+    assert result["valid"] is True, result["errors"]
+    assert "SV1*HC:A0120:76:U1*24.30*UN*2*41**1~" in x12
+    assert "SV1*HC:S0215*" in x12
+
+
+def test_pay_to_address_emits_2010ab_when_configured():
+    payload = _payload()
+    provider = payload["claims"][0]["provider"]
+    provider["pay_to_name"] = "WALLA PAY TO LLC"
+    provider["pay_to_address_line_1"] = "500 PAYTO ST"
+    provider["pay_to_city"] = "AURORA"
+    provider["pay_to_state"] = "CO"
+    provider["pay_to_zip"] = "80012"
+    x12 = render_edi_file(build_edi_content(payload))
+    result = validate_with_pyx12(x12)
+    assert result["valid"] is True, result["errors"]
+    assert "NM1*87*2~" in x12
+    assert "N3*500 PAYTO ST~" in x12
+    assert "N4*AURORA*CO*80012~" in x12
+    # Pay-to must sit after billing REF*EI and before subscriber HL.
+    assert x12.index("NM1*87*") > x12.index("REF*EI*")
+    assert x12.index("NM1*87*") < x12.index("HL*2*")
+    # X222A1: NM103 is Not Used on 2010AB.
+    assert "NM1*87*2*WALLA" not in x12
+
+
+def test_pay_to_without_zip_is_blocked():
+    payload = _payload()
+    provider = payload["claims"][0]["provider"]
+    provider["pay_to_address_line_1"] = "500 PAYTO ST"
+    provider["pay_to_city"] = "AURORA"
+    provider["pay_to_state"] = "CO"
+    try:
+        build_edi_content(payload)
+    except ValueError as exc:
+        assert "Pay-to zip" in str(exc)
+    else:
+        raise AssertionError("Missing pay-to zip must block generation")

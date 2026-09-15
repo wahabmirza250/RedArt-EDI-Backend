@@ -594,6 +594,10 @@ def create_claim_from_trip(
             created = ClaimServiceLine.objects.create(
                 claim=claim,
                 procedure_code=item.get("procedure_code"),
+                modifier_1=item.get("modifier_1"),
+                modifier_2=item.get("modifier_2"),
+                modifier_3=item.get("modifier_3"),
+                modifier_4=item.get("modifier_4"),
                 from_date=trip.service_date,
                 to_date=trip.service_date,
                 units=item.get("units"),

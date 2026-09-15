@@ -18,6 +18,12 @@ WRITE_FIELDS = (
     "country",
     "address_line_1",
     "address_line_2",
+    "pay_to_name",
+    "pay_to_address_line_1",
+    "pay_to_address_line_2",
+    "pay_to_city",
+    "pay_to_state",
+    "pay_to_zip",
     "phone",
     "email",
     "is_active",
@@ -115,6 +121,27 @@ class ProviderBillingProfileSerializer(serializers.ModelSerializer):
         return clean_optional_text(value)
 
     def validate_address_line_2(self, value):
+        return clean_optional_text(value)
+
+    def validate_pay_to_name(self, value):
+        return clean_optional_text(value)
+
+    def validate_pay_to_address_line_1(self, value):
+        return clean_optional_text(value)
+
+    def validate_pay_to_address_line_2(self, value):
+        return clean_optional_text(value)
+
+    def validate_pay_to_city(self, value):
+        return clean_optional_text(value)
+
+    def validate_pay_to_state(self, value):
+        value = clean_optional_text(value)
+        if value is None:
+            return value
+        return value.upper()
+
+    def validate_pay_to_zip(self, value):
         return clean_optional_text(value)
 
     def validate_phone(self, value):

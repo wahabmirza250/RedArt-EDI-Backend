@@ -113,6 +113,10 @@ class Generate837PHandler:
                 lines.append(
                     {
                         "procedure_code": line.procedure_code,
+                        "modifier_1": line.modifier_1,
+                        "modifier_2": line.modifier_2,
+                        "modifier_3": line.modifier_3,
+                        "modifier_4": line.modifier_4,
                         "from_date": _date_ymd(line.from_date or trip.service_date),
                         "to_date": _date_ymd(line.to_date or trip.service_date),
                         "units": line.units or trip.mileage_units or 1,
@@ -163,6 +167,16 @@ class Generate837PHandler:
                         "state": provider.state,
                         "zip": provider.zip,
                         "phone": provider.phone,
+                        "pay_to_name": getattr(provider, "pay_to_name", None),
+                        "pay_to_address_line_1": getattr(
+                            provider, "pay_to_address_line_1", None
+                        ),
+                        "pay_to_address_line_2": getattr(
+                            provider, "pay_to_address_line_2", None
+                        ),
+                        "pay_to_city": getattr(provider, "pay_to_city", None),
+                        "pay_to_state": getattr(provider, "pay_to_state", None),
+                        "pay_to_zip": getattr(provider, "pay_to_zip", None),
                     },
                     "driver": {
                         "first_name": getattr(trip, "driver_first_name", None) or "",

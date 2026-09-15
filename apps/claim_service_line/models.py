@@ -22,6 +22,11 @@ class ClaimServiceLine(BaseModel):
         blank=True,
     )
     procedure_code = models.CharField(max_length=32, null=True, blank=True)
+    # X12 SV101 modifiers (e.g. 76 same rendering, 77 different rendering).
+    modifier_1 = models.CharField(max_length=2, null=True, blank=True)
+    modifier_2 = models.CharField(max_length=2, null=True, blank=True)
+    modifier_3 = models.CharField(max_length=2, null=True, blank=True)
+    modifier_4 = models.CharField(max_length=2, null=True, blank=True)
     from_date = models.DateField(null=True, blank=True)
     to_date = models.DateField(null=True, blank=True)
     units = models.PositiveIntegerField(null=True, blank=True)
@@ -38,6 +43,19 @@ class ClaimServiceLine(BaseModel):
         blank=True,
     )
     is_active = models.BooleanField(default=True)
+
+    def active_modifiers(self):
+        """Return non-blank modifiers in SV101 order."""
+        return [
+            value.strip().upper()
+            for value in (
+                self.modifier_1,
+                self.modifier_2,
+                self.modifier_3,
+                self.modifier_4,
+            )
+            if (value or "").strip()
+        ]
 
     objects = ClaimServiceLineQuerySet.as_manager()
 

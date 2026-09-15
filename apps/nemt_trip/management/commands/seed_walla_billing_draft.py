@@ -354,6 +354,7 @@ class Command(BaseCommand):
                     service_lines=[
                         {
                             "procedure_code": "A0120",
+                            "modifier_1": "76",
                             "units": base_units,
                             "charge": base_charge,
                         },
@@ -370,9 +371,7 @@ class Command(BaseCommand):
                     claim.save(update_fields=["status", "updated_at"])
                 created += 1
 
-            # This command prepares draft billing data only. The generic validator
-            # does not yet represent service-line modifiers or a separate pay-to
-            # address, so it must not promote these claims to READY_FOR_837P.
+            # Keep claims in DRAFT until pay-to / readiness is confirmed in production.
             result = validate_claim_for_edi(claim, update_status=False)
             if result["ready"]:
                 ready += 1
@@ -456,18 +455,37 @@ class Command(BaseCommand):
 
         lines = list(claim.service_lines.filter(is_active=True).order_by("id"))
         expected = [
-            ("A0120", base_units, None, base_charge),
-            ("S0215", mileage_units, reviewed_miles, mileage_charge),
+            ("A0120", "76", base_units, None, base_charge),
+            ("S0215", None, mileage_units, reviewed_miles, mileage_charge),
         ]
         actual = [
-            (line.procedure_code, line.units, line.mileage, line.charge)
+            (
+                line.procedure_code,
+                (line.modifier_1 or None),
+                line.units,
+                line.mileage,
+                line.charge,
+            )
             for line in lines
         ]
-        if actual != expected:
-            raise CommandError(
-                f"Existing claim {claim.id} service lines do not match the "
-                "authorized seed calculation; review them manually."
-            )
+        if actual == expected:
+            return
+
+        # Production seed may predate modifiers: same dollars/units, missing 76.
+        legacy = [
+            ("A0120", None, base_units, None, base_charge),
+            ("S0215", None, mileage_units, reviewed_miles, mileage_charge),
+        ]
+        if actual == legacy and len(lines) == 2:
+            a0120 = lines[0]
+            a0120.modifier_1 = "76"
+            a0120.save(update_fields=["modifier_1", "updated_at"])
+            return
+
+        raise CommandError(
+            f"Existing claim {claim.id} service lines do not match the "
+            "authorized seed calculation; review them manually."
+        )
 
     def _claim_rates(self, options):
         if not options["create_claims"]:

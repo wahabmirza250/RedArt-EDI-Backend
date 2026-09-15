@@ -17,6 +17,10 @@ class ClaimServiceLineSerializer(serializers.ModelSerializer):
             "claim",
             "claim_number",
             "procedure_code",
+            "modifier_1",
+            "modifier_2",
+            "modifier_3",
+            "modifier_4",
             "from_date",
             "to_date",
             "units",
@@ -30,6 +34,30 @@ class ClaimServiceLineSerializer(serializers.ModelSerializer):
 
     def validate_procedure_code(self, value):
         return clean_optional_text(value)
+
+    def validate_modifier_1(self, value):
+        return self._clean_modifier(value)
+
+    def validate_modifier_2(self, value):
+        return self._clean_modifier(value)
+
+    def validate_modifier_3(self, value):
+        return self._clean_modifier(value)
+
+    def validate_modifier_4(self, value):
+        return self._clean_modifier(value)
+
+    @staticmethod
+    def _clean_modifier(value):
+        value = clean_optional_text(value)
+        if value is None:
+            return value
+        value = value.upper()
+        if len(value) > 2:
+            raise serializers.ValidationError(
+                "Modifier must be at most 2 characters."
+            )
+        return value
 
     def validate_units(self, value):
         if value is None:
@@ -71,6 +99,10 @@ class ClaimServiceLineListSerializer(serializers.ModelSerializer):
             "id",
             "claim",
             "procedure_code",
+            "modifier_1",
+            "modifier_2",
+            "modifier_3",
+            "modifier_4",
             "from_date",
             "to_date",
             "units",
