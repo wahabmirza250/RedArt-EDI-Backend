@@ -32,7 +32,7 @@ class NemtTripAdmin(admin.ModelAdmin):
         "provider__billing_name",
         "provider__npi",
     )
-    ordering = ("-service_date", "-id")
+    ordering = ("-id",)
     list_per_page = 50
     autocomplete_fields = ("patient", "provider")
     readonly_fields = ("id", "created_at", "updated_at")

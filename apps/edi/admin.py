@@ -29,6 +29,7 @@ class EDIControlNumberAdmin(admin.ModelAdmin):
     )
     list_filter = ("environment", "is_active")
     search_fields = ("isa13", "gs06", "batch__batch_number")
+    ordering = ("-id",)
     autocomplete_fields = ("batch",)
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -47,6 +48,7 @@ class EDIFileAdmin(admin.ModelAdmin):
     )
     list_filter = ("transaction_type", "status", "is_active")
     search_fields = ("filename", "file_hash", "path_or_blob_ref", "batch__batch_number")
+    ordering = ("-id",)
     autocomplete_fields = ("batch", "control_number")
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -72,6 +74,7 @@ class EDIFileTransferLogAdmin(admin.ModelAdmin):
         "celery_task_id",
         "edi_file__filename",
     )
+    ordering = ("-id",)
     autocomplete_fields = ("edi_file",)
     readonly_fields = ("id", "created_at", "updated_at", "detail")
 
@@ -97,6 +100,7 @@ class EDIAcknowledgementAdmin(admin.ModelAdmin):
         "message",
         "batch__batch_number",
     )
+    ordering = ("-id",)
     autocomplete_fields = ("batch", "edi_file")
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -117,6 +121,7 @@ class EDIValidationReportAdmin(admin.ModelAdmin):
     )
     list_filter = ("report_type", "status", "is_active")
     search_fields = ("task_id", "file_name", "file_hash", "report_guid", "message")
+    ordering = ("-id",)
     autocomplete_fields = ("batch", "edi_file")
     readonly_fields = ("id", "created_at", "updated_at", "file_hash", "parsed_summary")
 
@@ -143,6 +148,7 @@ class EDI277ImportAdmin(admin.ModelAdmin):
         "celery_task_id",
         "message",
     )
+    ordering = ("-id",)
     autocomplete_fields = (
         "credentials",
         "directory",
@@ -169,6 +175,7 @@ class SFTPCredentialsAdmin(admin.ModelAdmin):
     )
     list_filter = ("environment", "auth_type", "is_active")
     search_fields = ("name", "host", "username")
+    ordering = ("-id",)
     autocomplete_fields = ("trading_partner",)
     # Never echo ciphertext / PEM in admin change forms.
     readonly_fields = (
@@ -228,6 +235,7 @@ class SFTPDirectoryAdmin(admin.ModelAdmin):
     )
     list_filter = ("purpose", "is_active")
     search_fields = ("name", "sending_path", "receiving_path", "credentials__name")
+    ordering = ("-id",)
     autocomplete_fields = ("credentials",)
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -254,6 +262,7 @@ class EDI999ImportAdmin(admin.ModelAdmin):
         "celery_task_id",
         "message",
     )
+    ordering = ("-id",)
     autocomplete_fields = (
         "credentials",
         "directory",
@@ -285,6 +294,7 @@ class EDI835ImportAdmin(admin.ModelAdmin):
         "celery_task_id",
         "message",
     )
+    ordering = ("-id",)
     autocomplete_fields = ("credentials", "directory", "remittance")
     readonly_fields = ("id", "created_at", "updated_at", "started_at", "finished_at")
 
@@ -320,6 +330,7 @@ class EDI835RemittanceAdmin(admin.ModelAdmin):
     )
     list_filter = ("is_active", "payment_method")
     search_fields = ("file_hash", "trace_number", "isa13", "raw_file_ref", "message")
+    ordering = ("-id",)
     readonly_fields = ("id", "created_at", "updated_at", "file_hash")
     inlines = [EDI835ClaimPaymentInline]
 
@@ -339,5 +350,6 @@ class EDI835ClaimPaymentAdmin(admin.ModelAdmin):
     )
     list_filter = ("outcome", "status_applied", "is_active")
     search_fields = ("claim_number", "payer_claim_control", "adjustment_codes")
+    ordering = ("-id",)
     autocomplete_fields = ("remittance", "claim")
     readonly_fields = ("id", "created_at", "updated_at")

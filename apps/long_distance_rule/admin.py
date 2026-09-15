@@ -16,7 +16,7 @@ class LongDistanceRuleAdmin(admin.ModelAdmin):
     )
     list_filter = ("county_type", "is_active", "created_at")
     search_fields = ("county_type",)
-    ordering = ("county_type",)
+    ordering = ("-id",)
     list_per_page = 50
     readonly_fields = ("id", "created_at", "updated_at")
     fieldsets = (

@@ -92,6 +92,7 @@ class ClaimDocumentAdmin(admin.ModelAdmin):
     )
     list_filter = ("document_type", "status", "is_signed", "is_active")
     search_fields = ("file_name", "document_hash", "claim__claim_number")
+    ordering = ("-id",)
     autocomplete_fields = ("claim",)
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -111,6 +112,7 @@ class SubmissionBatchAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "environment", "is_active")
     search_fields = ("batch_number", "trading_partner__name")
+    ordering = ("-id",)
     autocomplete_fields = ("trading_partner",)
     readonly_fields = (
         "id",
@@ -126,6 +128,7 @@ class BatchClaimAdmin(admin.ModelAdmin):
     list_display = ("id", "batch", "claim", "st02", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("st02", "batch__batch_number", "claim__claim_number")
+    ordering = ("-id",)
     autocomplete_fields = ("batch", "claim")
     readonly_fields = ("id", "created_at", "updated_at")
 
@@ -150,5 +153,6 @@ class AttachmentSubmissionAdmin(admin.ModelAdmin):
         "notes",
         "claim__claim_number",
     )
+    ordering = ("-id",)
     autocomplete_fields = ("claim",)
     readonly_fields = ("id", "created_at", "updated_at")

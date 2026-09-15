@@ -1,0 +1,58 @@
+---
+description: Backend security, reliability, performance, and scalability standards
+alwaysApply: true
+---
+
+# Backend development standards
+
+Apply these rules to all backend development. Prefer root-cause fixes over patches that hide failure.
+
+1. **Understand before changing.** Read the relevant code, callers, database models, and tests first. Identify affected workflows and preserve existing business rules.
+
+2. **Keep the architecture simple.** Use clear module boundaries and separate business logic from HTTP handlers and external integrations. Reuse existing solutions. Introduce services, dependencies, or abstractions only when justified.
+
+3. **Fix root causes.** Investigate failures before patching them. Never hide errors, bypass validation, or return fake success to make a workflow appear fixed.
+
+4. **Enforce authorization on the server.** Authenticate protected operations and verify permissions for every requested resource. Deny access by default and use least privilege.
+
+5. **Isolate every tenant.** Derive tenant access from verified identity and membership. Scope database queries, jobs, files, and cache keys by tenant. Never trust a company ID supplied by the client without authorization.
+
+6. **Validate all external input.** Validate types, lengths, ranges, formats, and allowed fields. Enforce business rules on the backend. Use parameterized queries. Never execute user input as code or shell commands.
+
+7. **Protect secrets and sensitive data.** Use managed secrets or environment configuration. Never expose credentials, tokens, or patient information in logs, errors, or fixtures. Use established authentication and cryptography libraries.
+
+8. **Bound resource consumption.** Set explicit limits for request sizes, uploads, pagination, batches, concurrency, queues, and execution time. Rate-limit expensive operations. Never load an entire growing dataset into memory.
+
+9. **Release resources reliably.** Close files, database connections, network clients, and subprocesses. Clean up temporary files, timers, and background tasks after success, failure, cancellation, and shutdown. Bound caches and retained data.
+
+10. **Keep database operations efficient.** Avoid N+1 queries and unnecessary columns. Use bounded batches. Add indexes based on query patterns and inspect query plans for expensive paths. Budget connection pools across all replicas.
+
+11. **Protect data integrity under concurrency.** Use database constraints, short transactions, and appropriate locking or atomic updates. Do not rely on application-only duplicate checks or process-local locks when multiple workers can run.
+
+12. **Make repeated operations safe.** Use durable, tenant-scoped idempotency keys for operations that must not happen twice. Reject reuse with a different payload. Handle simultaneous requests and worker redelivery safely.
+
+13. **Handle external failures deliberately.** Set connection and operation timeouts. Retry only transient failures when repetition is safe, with capped attempts, backoff, and jitter. Respect rate limits. Reconcile uncertain outcomes before resubmitting.
+
+14. **Run long work through durable jobs.** Move slow or expensive work out of request handlers when appropriate. Persist progress, bound worker concurrency, and support recovery after crashes. Track exhausted retries and alert on failed or stalled jobs.
+
+15. **Make workflow states explicit.** Define valid transitions and enforce them atomically. Distinguish pending, processing, failed, uncertain, and confirmed results. Never mark an external action successful without supporting evidence.
+
+16. **Design for multiple instances.** Keep durable state outside application memory and ephemeral disks. Coordinate scheduled work so additional replicas do not duplicate it. Support graceful shutdown without losing accepted work.
+
+17. **Use caching carefully.** Define maximum size, expiration, invalidation, and tenant isolation. Keep authoritative records in durable storage. Prevent stale cached permissions or financial data from authorizing incorrect actions.
+
+18. **Preserve numerical and date accuracy.** Use decimal arithmetic or integer minor units for money, with explicit rounding rules. Use timezone-aware timestamps for events and preserve date-only business fields without unintended timezone conversion.
+
+19. **Make changes compatible and recoverable.** Preserve API contracts or version breaking changes. Use staged database migrations compatible with overlapping deployments. Assess locks, batch large backfills, and document recovery procedures.
+
+20. **Keep configuration explicit.** Never hard-code company details, provider identifiers, credentials, or customer-specific rates. Validate required configuration at startup. Never invent missing business data or silently substitute defaults.
+
+21. **Make failures observable.** Use structured, redacted logs and request/job correlation IDs. Expose health and readiness checks. Track latency, errors, resource usage, queue age, and dependency failures without unbounded metric labels.
+
+22. **Verify meaningful behavior.** Test affected business rules, authorization, tenant isolation, duplicate requests, concurrency, and failure recovery where relevant. Add regression coverage for substantial bugs. Use synthetic test data.
+
+23. **Keep dependencies and CI dependable.** Use supported dependencies and reproducible dependency versions. Run applicable tests, linting, type checks, and security scans in CI. Never disable checks or weaken tests merely to get a passing result.
+
+24. **Prove performance claims.** Measure relevant latency, throughput, query counts, and memory usage before and after performance changes under representative load. Do not claim scalability or absence of leaks without evidence.
+
+25. **Review before finishing.** Inspect the final diff for logical errors, security gaps, race conditions, resource leaks, and unintended changes. Report what changed, what was actually verified, and any remaining limitations. Never claim a check passed if it was not run.

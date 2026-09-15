@@ -62,6 +62,9 @@ outbox/
 *.sqlite3
 *.dump
 
+# Local PHI / billing seed payloads — never commit
+local_data/
+
 
 # Test / coverage / type / lint
 .coverage
