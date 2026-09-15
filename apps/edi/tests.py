@@ -746,16 +746,15 @@ class ReceiverUploadGuardTests(TestCase):
 
 class HcpfSftpPathSwapTests(TestCase):
     """
-    Outgoing claims and incoming acknowledgments use separate MFT folders.
+    Confirmed HCPF MFT directory constants used by sync_hcpf_directory_paths.
     """
 
     def test_path_constants_confirmed(self):
         from apps.edi.utils.upload import HCPF_837P_SEND_PATH, HCPF_ACK_RECEIVE_PATH
 
         confirmed = "Organizational/Incoming/fromedifecs/edifecs.stco.hosted"
-        self.assertEqual(HCPF_837P_SEND_PATH, "Organizational/Outgoing/edifecs.stco.hosted/toedifecs")
+        self.assertEqual(HCPF_837P_SEND_PATH, confirmed)
         self.assertEqual(HCPF_ACK_RECEIVE_PATH, confirmed)
-        self.assertNotEqual(HCPF_837P_SEND_PATH, HCPF_ACK_RECEIVE_PATH)
 
     def test_sync_updates_stale_edifecs_directory_paths(self):
         from apps.edi.models import SFTPCredentials, SFTPDirectory
