@@ -588,6 +588,7 @@ def queue_edi_999_import_poll(*, credentials_id=None, batch_id=None):
     Returns summary dict for the API (importing started).
     """
     from apps.edi.tasks import process_edi_999_import_task
+    from apps.edi.utils.import_dispatch import dispatch_import
 
     created, skipped_existing, errors = discover_edi_999_imports(
         credentials_id=credentials_id,
@@ -595,11 +596,7 @@ def queue_edi_999_import_poll(*, credentials_id=None, batch_id=None):
     )
     queued_ids = []
     for row in created:
-        async_result = process_edi_999_import_task.delay(row.id, batch_id)
-        row.celery_task_id = async_result.id
-        row.status = EDI999ImportStatus.QUEUED
-        row.message = "Importing started (Celery task queued)."
-        row.save(update_fields=["celery_task_id", "status", "message", "updated_at"])
+        dispatch_import(row, process_edi_999_import_task, batch_id)
         queued_ids.append(row.id)
 
     return {

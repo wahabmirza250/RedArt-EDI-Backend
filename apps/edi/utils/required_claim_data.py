@@ -37,7 +37,8 @@ def billing_address_errors(provider):
     errors = []
     for field in ("address_line_1", "city", "state", "zip"):
         if not str(provider.get(field) or "").strip():
-            errors.append(f"Billing provider {field} is required for 2010AA N3/N4.")
+            location = '2010AA N4-03' if field == 'zip' else '2010AA N3/N4'
+            errors.append(f"Billing provider {field} is required for {location}.")
     postal = str(provider.get("zip") or "").strip()
     if postal and not re.fullmatch(r"[0-9]{5}(?:[0-9]{4}|-[0-9]{4})?", postal):
         errors.append("Billing provider zip must be a real 5-digit ZIP or ZIP+4; never pad or invent digits.")

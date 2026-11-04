@@ -178,7 +178,7 @@ def allocate_control_numbers(
                 .filter(batch_id=batch.id, is_active=True)
                 .first()
             )
-            if existing is not None:
+            if existing is not None and not force_new:
                 return existing, False
             # ISA13/GS06 collision — retry with next numbers (clear overrides).
             isa13 = None

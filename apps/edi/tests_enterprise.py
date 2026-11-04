@@ -59,7 +59,7 @@ class EnterpriseFixturesMixin:
     All identifiers are clearly fabricated test values.
     """
 
-    PARTNER_SENDER = "TESTSENDER1"
+    PARTNER_SENDER = "TP123458"  # Synthetic numeric TPID, never a real payer account.
     PROVIDER_NPI = "1999999999"
     PROVIDER_TAX_ID = "999999999"
     MEMBER_ID = "TSTMEMBER001"
@@ -88,7 +88,7 @@ class EnterpriseFixturesMixin:
             legal_name="Test Transport LLC",
             billing_name="Test Transport LLC",
             npi=npi if not is_atypical else None,
-            tax_id=tax_id if not is_atypical else None,
+            tax_id=tax_id,
             is_atypical=is_atypical,
             medicaid_provider_id=medicaid_provider_id,
             taxonomy_code=taxonomy_code,
@@ -301,6 +301,7 @@ class TestAtypicalProvider(EnterpriseFixturesMixin, TestCase):
     def _build_atypical_batch(self):
         atypical_provider = self._make_provider(
             is_atypical=True,
+            tax_id=self.PROVIDER_TAX_ID,
             medicaid_provider_id="ATYPTST001",
             taxonomy_code="343900000X",
         )
@@ -328,19 +329,28 @@ class TestAtypicalProvider(EnterpriseFixturesMixin, TestCase):
         # NM108/NM109 blank: NM1*85*2*NAME~  (trailing ~ immediately after name)
         self.assertIn("NM1*85*2*", body)
 
-    def test_atypical_provider_no_ref_ei_without_tax_id(self):
-        """Atypical provider: no EIN, so REF*EI must NOT appear."""
+    def test_atypical_provider_blocks_missing_tax_id(self):
+        """Atypical providers still require their own billing tax identity."""
         from apps.edi.utils.handler import Generate837PHandler
         batch = self._build_atypical_batch()
         payload = Generate837PHandler(batch.id).build_payload_dict()
-        body = render_edi_file(build_edi_content(payload))
-        self.assertNotIn("REF*EI*", body)
+        payload['claims'][0]['provider']['tax_id'] = ''
+        with self.assertRaisesRegex(ValueError, 'Tax ID/EIN'):
+            build_edi_content(payload)
 
     def test_atypical_provider_readiness_accepts_no_npi(self):
         """Batch with atypical provider must pass readiness without NPI."""
         batch = self._build_atypical_batch()
         result = assert_batch_ready_for_837p_generation(batch)
         self.assertTrue(result)
+
+    def test_atypical_missing_tax_id_rejected_before_generation(self):
+        batch = self._build_atypical_batch()
+        row = BatchClaim.objects.get(batch=batch, is_active=True)
+        provider = row.claim.trip.provider
+        provider.tax_id = ''
+        provider.save(update_fields=['tax_id', 'updated_at'])
+        self.assertTrue(any('tax_id' in error for error in collect_batch_readiness_errors(batch)))
 
     def test_atypical_provider_missing_medicaid_provider_id_fails(self):
         """Atypical provider without medicaid_provider_id must fail readiness."""
@@ -455,13 +465,13 @@ class TestValidationErrors(EnterpriseFixturesMixin, TestCase):
                     "first_name": "T", "last_name": "P",
                     "medicaid_member_id": "TSTMEM001",
                     "date_of_birth": "", "gender": "",
-                    "address_line_1": "", "city": "", "state": "", "zip": "", "phone": "",
+                    "address_line_1": "100 Test St", "city": "Denver", "state": "CO", "zip": "80202", "phone": "",
                 },
                 "provider": {
                     "legal_name": "TP", "billing_name": "TP",
                     "is_atypical": False, "npi": "1999999999", "medicaid_provider_id": "",
                     "taxonomy_code": "343900000X", "tax_id": "999999999",
-                    "address_line_1": "", "city": "", "state": "", "zip": "", "phone": "",
+                    "address_line_1": "100 Test St", "city": "Denver", "state": "CO", "zip": "80202", "phone": "",
                 },
                 "driver": {},
                 "service_lines": [

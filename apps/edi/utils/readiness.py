@@ -25,6 +25,7 @@ Rules (Colorado Medicaid NEMT):
 
     Atypical Colorado Medicaid provider (is_atypical=True, no NPI):
       - medicaid_provider_id required → REF*G2 in 2010AA
+      - own 9-digit billing tax_id required (REF*EI); never use Medicaid ID as tax ID
       - NM108/NM109 omitted (XX is reserved for NPI; never use XX with a non-NPI)
       - npi must be absent — never fabricate one
 
@@ -95,7 +96,7 @@ def _validate_patient(patient, claim_label: str) -> list[str]:
 def _validate_provider(provider, claim_label: str) -> list[str]:
     """
     Standard NPI provider:  npi + tax_id + taxonomy_code required.
-    Atypical provider:       medicaid_provider_id required (→ REF*G2); no NPI.
+    Atypical provider:       medicaid_provider_id and own tax_id required; no NPI.
                              XX qualifier is reserved for NPI — never use with a Medicaid ID.
     Both: full billing address (N3/N4) — empty zip causes HCPF 999 IK4*I9.
     """
@@ -135,14 +136,15 @@ def _validate_provider(provider, claim_label: str) -> list[str]:
                 "(required for standard 837P billing provider NM108=XX). "
                 "If this is an atypical provider, set is_atypical=True."
             )
-        tax_id_raw = (getattr(provider, "tax_id", None) or "").strip()
-        tax_id = "".join(ch for ch in tax_id_raw if ch.isdigit())
-        if not tax_id:
-            errors.append(
-                f"{claim_label}: provider {pid} is missing tax_id (EIN/TIN). "
-                "REF*EI is required in 837P 2010AA when NM108=XX (NPI provider). "
-                "Set tax_id via the provider API — never hard-code it."
-            )
+
+    tax_id_raw = (getattr(provider, "tax_id", None) or "").strip()
+    tax_id = "".join(ch for ch in tax_id_raw if ch.isdigit())
+    if len(tax_id) != 9:
+        errors.append(
+            f"{claim_label}: provider {pid} tax_id (EIN/TIN) must contain exactly "
+            "9 digits for 2010AA REF*EI, including atypical providers. "
+            "Set the provider's own tax_id via the provider API; never substitute another identifier."
+        )
 
     return errors
 

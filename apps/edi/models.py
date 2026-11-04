@@ -67,11 +67,6 @@ class EDIControlNumber(BaseModel):
         ordering = ("-id",)
         constraints = [
             models.UniqueConstraint(
-                fields=["batch"],
-                condition=models.Q(batch__isnull=False, is_active=True),
-                name="uniq_active_edi_control_per_batch",
-            ),
-            models.UniqueConstraint(
                 fields=["environment", "isa13"],
                 condition=models.Q(
                     environment__isnull=False,
