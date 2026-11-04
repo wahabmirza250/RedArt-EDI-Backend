@@ -133,7 +133,7 @@ PeriodicTask.objects.update_or_create(
         "interval": None,
         "task": "redartdigital.tasks.cleanup_celery_storage",
         "enabled": True,
-        "description": "Flush Celery Redis result storage every 24 hours (00:00 UTC).",
+        "description": "Verify Celery result expiry without flushing Redis or queued work.",
     },
 )
 
