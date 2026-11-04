@@ -19,7 +19,7 @@ class LongDistancePilotAPITests(AttachmentWorkflowAPITests):
         super().setUp()
         self.partner = TradingPartner.objects.create(
             name="Test Transport LLC",
-            sender_id="SMPLSENDER1",
+            sender_id="TP123457",  # Synthetic numeric TPID, matching HCPF filenames.
             receiver_id="COMEDASSISTPROG",
             environment="TEST",
         )

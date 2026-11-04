@@ -769,7 +769,7 @@ class EDIFileQueueUploadAPIView(APIView):
                 request_only=True,
             )
         ],
-        responses={202: EDIFileIdSerializer},
+        responses={200: EDIFileIdSerializer, 502: dict},
     )
     def post(self, request, pk):
         try:
@@ -800,6 +800,14 @@ class EDIFileQueueUploadAPIView(APIView):
                 attempt=attempt,
                 credentials_id=credentials_id,
             )
+
+            if result.get('status') != 'UPLOADED':
+                return error_response(
+                    'EDI file was not delivered to the trading partner. Review the transfer logs before retrying.',
+                    errors={'edi_file_id': edi_file.id, 'attempt': attempt,
+                            'transfer_log_ids': [sftp_log.id, s3_log.id]},
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                )
 
             return success_response(
                 "EDI file upload completed.",

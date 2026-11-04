@@ -132,8 +132,7 @@ class EDIServiceTests(EDIFixturesMixin, TestCase):
         self.assertEqual(again.id, row.id)
 
         name = build_colorado_837p_filename(sender_id="TP123456")
-        self.assertTrue(name.startswith("TP123456-837P-"))
-        self.assertTrue(name.endswith("-1of1.txt"))
+        self.assertRegex(name, r"^tp123456-837P-[0-9]{17}-1of1\.x12$")
 
         envelope = get_edi_envelope_config("TEST")
         self.assertEqual(envelope["isa15"], "T")
@@ -196,7 +195,7 @@ class EDIAPITests(EDIFixturesMixin, AuthAPITestCase):
         self.assertEqual(created.status_code, status.HTTP_201_CREATED)
         file_id = created.data["data"]["id"]
         self.assertTrue(
-            created.data["data"]["filename"].startswith("TP123456-837P-")
+            created.data["data"]["filename"].startswith("tp123456-837P-")
         )
 
         marked = self.client.post(
@@ -268,7 +267,7 @@ class Generate837PTests(EDIFixturesMixin, AuthAPITestCase):
 
         edi_file, _, _ = handler.generate()
         self.assertEqual(edi_file.status, EDIFileStatus.GENERATED)
-        self.assertTrue(edi_file.filename.startswith("TP123456-837P-"))
+        self.assertRegex(edi_file.filename, r"^tp123456-837P-[0-9]{17}-1of1\.x12$")
         self.assertTrue(edi_file.file_hash)
         # After generation, claim status advances to EDI_GENERATED (not yet uploaded).
         self.claim.refresh_from_db()
@@ -324,7 +323,8 @@ class Generate837PTests(EDIFixturesMixin, AuthAPITestCase):
                     {},
                     format="json",
                 )
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["status"], EDIFileStatus.UPLOADED)
         edi_file.refresh_from_db()
         self.assertEqual(edi_file.status, EDIFileStatus.UPLOADED)
         logs = EDIFileTransferLog.objects.filter(edi_file=edi_file)
@@ -357,7 +357,8 @@ class Generate837PTests(EDIFixturesMixin, AuthAPITestCase):
                     {"credentials_id": cred.id},
                     format="json",
                 )
-        self.assertEqual(again.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(again.status_code, status.HTTP_200_OK)
+        self.assertEqual(again.data['data']['status'], EDIFileStatus.UPLOADED)
         edi_file.refresh_from_db()
         self.assertEqual(edi_file.status, EDIFileStatus.UPLOADED)
         self.assertEqual(
